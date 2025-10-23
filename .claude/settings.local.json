@@ -1,6 +1,31 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__laravel-boost__application-info",
+      "mcp__laravel-boost__database-schema",
+      "Bash(php artisan make:migration create_emails_table --no-interaction)",
+      "Bash(php artisan make:migration create_attachments_table --no-interaction)",
+      "Bash(php artisan make:migration create_audit_logs_table --no-interaction)",
+      "Bash(php artisan migrate)",
+      "Bash(php artisan make:model Email --factory --no-interaction)",
+      "Bash(php artisan make:model Attachment --factory --no-interaction)",
+      "Bash(php artisan make:model AuditLog --factory --no-interaction)",
+      "Bash(vendor/bin/pint --dirty)",
+      "Bash(composer require laravel/scout meilisearch/meilisearch-php --no-interaction)",
+      "Bash(php artisan vendor:publish --provider=\"Laravel\\Scout\\ScoutServiceProvider\" --no-interaction)",
+      "Bash(php artisan make:controller Api/EmailWebhookController --no-interaction)",
+      "Bash(php artisan make:migration add_compression_and_deduplication_fields --no-interaction)",
+      "Bash(php artisan make:controller EmailController --no-interaction)",
+      "Bash(php artisan make:test Feature/EmailArchivingTest --pest --no-interaction)",
+      "Bash(php artisan make:test Unit/GoBDComplianceTest --unit --pest --no-interaction)",
+      "Bash(php artisan test --filter=GoBDComplianceTest)",
+      "Bash(php artisan test --filter=EmailArchivingTest)",
+      "Bash(php artisan test --filter=\"EmailArchivingTest|GoBDComplianceTest\")",
+      "Bash(npm run build)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "laravel-boost"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
