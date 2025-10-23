@@ -92,6 +92,11 @@ class Email extends Model
         return $calculatedHash === $this->hash;
     }
 
+    public function shouldBeSearchable(): bool
+    {
+        return config('scout.driver') !== null;
+    }
+
     public function toSearchableArray(): array
     {
         return [
