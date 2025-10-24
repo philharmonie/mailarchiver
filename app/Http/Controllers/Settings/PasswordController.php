@@ -14,9 +14,11 @@ class PasswordController extends Controller
     /**
      * Show the user's password settings page.
      */
-    public function edit(): Response
+    public function edit(Request $request): Response
     {
-        return Inertia::render('settings/password');
+        return Inertia::render('settings/password', [
+            'isAdmin' => $request->user()->isAdmin(),
+        ]);
     }
 
     /**
@@ -24,12 +26,19 @@ class PasswordController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
+        // Only admins can update their password (IMAP users authenticate via IMAP)
+        if (! $user->isAdmin()) {
+            abort(403, 'IMAP users cannot change their password here. Please change it in your mailbox.');
+        }
+
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $request->user()->update([
+        $user->update([
             'password' => $validated['password'],
         ]);
 

@@ -11,7 +11,6 @@ class ArchiveEmailsCommand extends Command
     protected $signature = 'emails:archive
                             {--account= : Specific account ID to fetch from}
                             {--limit= : Maximum number of emails to fetch per account}
-                            {--all : Fetch all emails, not just unseen ones}
                             {--test : Test connection and show folder info}';
 
     protected $description = 'Fetch and archive emails from IMAP mailbox(es)';
@@ -35,7 +34,20 @@ class ArchiveEmailsCommand extends Command
                 return self::FAILURE;
             }
 
-            return $this->processAccount($account, $limit);
+            if (! $account->is_active) {
+                $this->warn("Account '{$account->name}' is inactive. Skipping.");
+
+                return self::SUCCESS;
+            }
+
+            $result = $this->processAccount($account, $limit);
+
+            // processAccount returns count or FAILURE constant
+            if ($result === self::FAILURE) {
+                return self::FAILURE;
+            }
+
+            return self::SUCCESS;
         }
 
         // Process all active accounts
@@ -86,36 +98,28 @@ class ArchiveEmailsCommand extends Command
                 $client = $this->imapService->getClient();
                 $folder = $client->getFolder($account->folder);
                 $total = $folder->query()->whereAll()->count();
-                $unseen = $folder->query()->unseen()->count();
 
                 $this->line(sprintf('  Total emails in folder: %d', $total));
-                $this->line(sprintf('  Unseen emails: %d', $unseen));
 
-                return 0;
+                return self::SUCCESS;
             }
 
-            $fetchAll = $this->option('all');
             $archivedCount = 0;
-
-            // Require limit when using --all to prevent hanging on large mailboxes
-            if ($fetchAll && ! $limit) {
-                $this->warn('  Using --all without --limit can be very slow for large mailboxes.');
-                $this->warn('  Applying default limit of 100 emails.');
-                $limit = 100;
-            }
 
             $this->line('  Fetching email list from server...');
 
             // Progress callback with counter display on first call
             $firstCall = true;
-            $progressCallback = function ($current, $total, $email, $error = null) use (&$archivedCount, &$firstCall) {
+            $progressCallback = function ($current, $total, $email, $error = null, $isDuplicate = false) use (&$archivedCount, &$firstCall) {
                 if ($firstCall) {
                     $this->line(sprintf('  Found %d email(s) to process', $total));
                     $firstCall = false;
                 }
 
                 if ($error) {
-                    $this->error(sprintf('  [%d/%d] Failed: %s', $current, $total, $error->getMessage()));
+                    $this->error(sprintf('  [%d/%d] ✗ Failed: %s', $current, $total, $error->getMessage()));
+                } elseif ($isDuplicate) {
+                    $this->line(sprintf('  [%d/%d] ⊝ Already archived (skipped)', $current, $total));
                 } else {
                     $archivedCount++;
                     $subject = mb_strlen($email->subject) > 50
@@ -125,7 +129,7 @@ class ArchiveEmailsCommand extends Command
                 }
             };
 
-            $archived = $this->imapService->fetchAndArchiveEmails($limit, $fetchAll, $progressCallback);
+            $archived = $this->imapService->fetchAndArchiveEmails($limit, $progressCallback);
 
             if (empty($archived)) {
                 $this->line('  No new emails.');

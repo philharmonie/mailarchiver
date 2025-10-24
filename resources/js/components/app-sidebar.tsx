@@ -11,29 +11,32 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { LayoutGrid, Mail, Server } from 'lucide-react';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Emails',
-        href: '/emails',
-        icon: Mail,
-    },
-    {
-        title: 'IMAP Accounts',
-        href: '/imap-accounts',
-        icon: Server,
-    },
-];
-
 export function AppSidebar() {
+    const { auth } = usePage().props as { auth: { user: { role: string } } };
+    const isAdmin = auth?.user?.role === 'admin';
+
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        ...(!isAdmin ? [{
+            title: 'Emails',
+            href: '/emails',
+            icon: Mail,
+        }] : []),
+        ...(isAdmin ? [{
+            title: 'IMAP Accounts',
+            href: '/imap-accounts',
+            icon: Server,
+        }] : []),
+    ];
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>

@@ -26,6 +26,7 @@ class Attachment extends Model
         'storage_disk',
         'content_id',
         'is_inline',
+        'extracted_text',
     ];
 
     protected function casts(): array

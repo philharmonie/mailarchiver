@@ -16,41 +16,72 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', function () {
-        $accounts = App\Models\ImapAccount::withCount('emails')
-            ->get()
-            ->map(function ($account) {
-                return [
-                    'id' => $account->id,
-                    'name' => $account->name,
-                    'total_emails' => $account->total_emails,
-                    'total_size_bytes' => $account->total_size_bytes,
-                    'formatted_size' => $account->formatted_size,
-                    'last_fetch_at' => $account->last_fetch_at,
-                    'is_active' => $account->is_active,
-                ];
-            });
+    Route::get('dashboard', function (Illuminate\Http\Request $request) {
+        $user = $request->user();
+        $isAdmin = $user->isAdmin();
 
-        $totalEmails = App\Models\Email::count();
-        $totalSize = App\Models\Email::sum('size_bytes');
+        // Admins see only global statistics
+        if ($isAdmin) {
+            $totalEmails = App\Models\Email::count();
+            $totalSize = App\Models\Email::sum('size_bytes');
+            $totalAccounts = App\Models\ImapAccount::count();
+            $activeAccounts = App\Models\ImapAccount::where('is_active', true)->count();
+
+            return Inertia::render('dashboard', [
+                'stats' => [
+                    'total_emails' => $totalEmails,
+                    'total_size_bytes' => $totalSize,
+                    'total_accounts' => $totalAccounts,
+                    'active_accounts' => $activeAccounts,
+                ],
+                'is_admin' => true,
+            ]);
+        }
+
+        // Regular users see only their email stats
+        $userEmailsQuery = App\Models\Email::where(function ($q) use ($user) {
+            $q->where('from_address', $user->email)
+                ->orWhereJsonContains('to_addresses', $user->email);
+        });
+
+        $totalEmails = $userEmailsQuery->count();
+        $totalSize = $userEmailsQuery->sum('size_bytes');
+
+        // Emails this month
+        $emailsThisMonth = (clone $userEmailsQuery)
+            ->whereMonth('received_at', now()->month)
+            ->whereYear('received_at', now()->year)
+            ->count();
+
+        // Recent emails for display
+        $recentEmails = (clone $userEmailsQuery)
+            ->with('attachments:id,email_id,filename,size_bytes')
+            ->orderBy('received_at', 'desc')
+            ->take(5)
+            ->get();
 
         return Inertia::render('dashboard', [
-            'accounts' => $accounts,
             'stats' => [
                 'total_emails' => $totalEmails,
                 'total_size_bytes' => $totalSize,
-                'total_accounts' => $accounts->count(),
-                'active_accounts' => $accounts->where('is_active', true)->count(),
+                'emails_this_month' => $emailsThisMonth,
             ],
+            'recent_emails' => $recentEmails,
+            'is_admin' => false,
         ]);
     })->name('dashboard');
 
     Route::get('emails', [App\Http\Controllers\EmailController::class, 'index'])->name('emails.index');
     Route::get('emails/{email}', [App\Http\Controllers\EmailController::class, 'show'])->name('emails.show');
+    Route::get('emails/{email}/download', [App\Http\Controllers\EmailController::class, 'download'])->name('emails.download');
+});
 
+// Admin-only: IMAP Account Management
+Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::resource('imap-accounts', App\Http\Controllers\ImapAccountController::class);
     Route::post('imap-accounts/{imapAccount}/test', [App\Http\Controllers\ImapAccountController::class, 'test'])
         ->name('imap-accounts.test');
 });
 
+// User Settings (Profile, Password, 2FA, Appearance)
 require __DIR__.'/settings.php';

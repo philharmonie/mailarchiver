@@ -24,9 +24,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function Profile({
     mustVerifyEmail,
     status,
+    isAdmin,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    isAdmin: boolean;
 }) {
     const { auth } = usePage<SharedData>().props;
 
@@ -38,8 +40,21 @@ export default function Profile({
                 <div className="space-y-6">
                     <HeadingSmall
                         title="Profile information"
-                        description="Update your name and email address"
+                        description={
+                            isAdmin
+                                ? "Update your name and email address"
+                                : "IMAP users cannot change their email address here"
+                        }
                     />
+
+                    {!isAdmin && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                                Your account uses IMAP authentication. To change your email address,
+                                please contact your administrator or update it in your mailbox settings.
+                            </p>
+                        </div>
+                    )}
 
                     <Form
                         {...ProfileController.update.form()}
@@ -61,6 +76,7 @@ export default function Profile({
                                         required
                                         autoComplete="name"
                                         placeholder="Full name"
+                                        disabled={!isAdmin}
                                     />
 
                                     <InputError
@@ -81,6 +97,7 @@ export default function Profile({
                                         required
                                         autoComplete="username"
                                         placeholder="Email address"
+                                        disabled={!isAdmin}
                                     />
 
                                     <InputError
@@ -116,26 +133,28 @@ export default function Profile({
                                         </div>
                                     )}
 
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        disabled={processing}
-                                        data-test="update-profile-button"
-                                    >
-                                        Save
-                                    </Button>
+                                {isAdmin && (
+                                    <div className="flex items-center gap-4">
+                                        <Button
+                                            disabled={processing}
+                                            data-test="update-profile-button"
+                                        >
+                                            Save
+                                        </Button>
 
-                                    <Transition
-                                        show={recentlySuccessful}
-                                        enter="transition ease-in-out"
-                                        enterFrom="opacity-0"
-                                        leave="transition ease-in-out"
-                                        leaveTo="opacity-0"
-                                    >
-                                        <p className="text-sm text-neutral-600">
-                                            Saved
-                                        </p>
-                                    </Transition>
-                                </div>
+                                        <Transition
+                                            show={recentlySuccessful}
+                                            enter="transition ease-in-out"
+                                            enterFrom="opacity-0"
+                                            leave="transition ease-in-out"
+                                            leaveTo="opacity-0"
+                                        >
+                                            <p className="text-sm text-neutral-600">
+                                                Saved
+                                            </p>
+                                        </Transition>
+                                    </div>
+                                )}
                             </>
                         )}
                     </Form>

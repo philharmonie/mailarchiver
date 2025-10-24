@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
+use App\Services\ImapAuthenticationService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -40,6 +43,25 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        // Custom authentication: IMAP for users, database for admin
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::where('email', $request->email)->first();
+
+            // Admin users use database authentication
+            if ($user && $user->isAdmin()) {
+                if (Hash::check($request->password, $user->password)) {
+                    return $user;
+                }
+
+                return null;
+            }
+
+            // Regular users use IMAP authentication
+            $imapAuth = app(ImapAuthenticationService::class);
+
+            return $imapAuth->authenticate($request->email, $request->password);
+        });
     }
 
     /**

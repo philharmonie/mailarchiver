@@ -19,9 +19,11 @@ type Email = {
     message_id: string;
     from_address: string | null;
     from_name: string | null;
+    to_addresses: string[] | null;
     subject: string;
     received_at: string;
     has_attachments: boolean;
+    bcc_map_type: 'sender' | 'recipient' | 'both' | null;
     attachments: Array<{
         id: number;
         filename: string;
@@ -83,6 +85,28 @@ export default function EmailIndex({ emails, filters }: Props) {
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     };
 
+    const getBccMapTypeBadge = (type: 'sender' | 'recipient' | 'both' | null) => {
+        if (!type) return null;
+
+        const styles = {
+            sender: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+            recipient: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+            both: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+        };
+
+        const labels = {
+            sender: 'Sent',
+            recipient: 'Received',
+            both: 'Both',
+        };
+
+        return (
+            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${styles[type]}`}>
+                {labels[type]}
+            </span>
+        );
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Email Archive" />
@@ -125,7 +149,9 @@ export default function EmailIndex({ emails, filters }: Props) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[100px]">Type</TableHead>
                                     <TableHead className="w-[200px]">From</TableHead>
+                                    <TableHead className="w-[200px]">To</TableHead>
                                     <TableHead>Subject</TableHead>
                                     <TableHead className="w-[150px]">Received</TableHead>
                                     <TableHead className="w-[100px]">Attachments</TableHead>
@@ -134,7 +160,7 @@ export default function EmailIndex({ emails, filters }: Props) {
                             <TableBody>
                                 {emails.data.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
+                                        <TableCell colSpan={6} className="h-24 text-center">
                                             No emails found.
                                         </TableCell>
                                     </TableRow>
@@ -143,11 +169,34 @@ export default function EmailIndex({ emails, filters }: Props) {
                                         <TableRow key={email.id} className="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900">
                                             <TableCell>
                                                 <Link href={`/emails/${email.id}`} className="block">
+                                                    {getBccMapTypeBadge(email.bcc_map_type)}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link href={`/emails/${email.id}`} className="block">
                                                     <div className="font-medium">
                                                         {email.from_name || email.from_address || 'Unknown'}
                                                     </div>
                                                     {email.from_name && email.from_address && (
                                                         <div className="text-xs text-neutral-500">{email.from_address}</div>
+                                                    )}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link href={`/emails/${email.id}`} className="block">
+                                                    {email.to_addresses && email.to_addresses.length > 0 ? (
+                                                        <div>
+                                                            <div className="truncate font-medium">
+                                                                {email.to_addresses[0]}
+                                                            </div>
+                                                            {email.to_addresses.length > 1 && (
+                                                                <div className="text-xs text-neutral-500">
+                                                                    +{email.to_addresses.length - 1} more
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-neutral-400">-</span>
                                                     )}
                                                 </Link>
                                             </TableCell>

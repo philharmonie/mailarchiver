@@ -11,7 +11,8 @@ use Webklex\PHPIMAP\Message;
 class EmailParserService
 {
     public function __construct(
-        protected CompressionService $compression
+        protected CompressionService $compression,
+        protected TextExtractorService $textExtractor
     ) {}
 
     public function parseAndStore(string $rawEmail): Email
@@ -56,8 +57,18 @@ class EmailParserService
     /**
      * Parse and store an email from an IMAP Message object
      */
-    public function parseAndStoreFromImap(Message $message): Email
+    public function parseAndStoreFromImap(Message $message): ?Email
     {
+        // Get message ID first to check for duplicates
+        $messageId = $message->getMessageId() ?? '<'.Str::uuid().'@mailarchive.local>';
+
+        // Check if email already exists
+        $existingEmail = Email::where('message_id', $messageId)->first();
+        if ($existingEmail) {
+            // Email already archived, skip
+            return null;
+        }
+
         // Get raw email for hash and storage
         $rawEmail = $message->getRawBody();
 
@@ -88,8 +99,12 @@ class EmailParserService
             ? $this->compression->compress($rawEmail)
             : $rawEmail;
 
-        $email = Email::create([
-            'message_id' => $message->getMessageId() ?? '<'.Str::uuid().'@mailarchive.local>',
+        // Detect BCC map type based on from/to addresses
+        $bccMapType = $this->detectBccMapType($fromAddress, $toAddresses);
+
+        // Prepare email data array (reusable for internal emails)
+        $emailData = [
+            'message_id' => $messageId,
             'in_reply_to' => $message->getInReplyTo(),
             'references' => $message->getReferences() ? explode(' ', $message->getReferences()) : null,
             'from_address' => $fromAddress,
@@ -109,20 +124,60 @@ class EmailParserService
             'is_compressed' => $shouldCompress,
             'raw_email' => $rawEmailToStore,
             'has_attachments' => $message->hasAttachments(),
-        ]);
+        ];
 
-        // Store attachments
+        // Attachment data (will be attached to both emails if internal)
+        $attachmentData = [];
         if ($message->hasAttachments()) {
             $attachments = $message->getAttachments();
             foreach ($attachments as $attachment) {
-                $this->storeAttachment($email, [
+                $attachmentData[] = [
                     'contents' => $attachment->getContent(),
                     'filename' => $attachment->getName(),
                     'mime_type' => $attachment->getMimeType(),
                     'content_id' => $attachment->getId(),
                     'is_inline' => $attachment->getDisposition() === 'inline',
-                ]);
+                ];
             }
+        }
+
+        // For internal emails (both sender and recipient are from configured domains),
+        // create TWO separate email records - one as 'sender' and one as 'recipient'
+        if ($bccMapType === 'both') {
+            // Create first email as 'sender' (outgoing)
+            $senderEmail = Email::create(array_merge($emailData, [
+                'bcc_map_type' => 'sender',
+            ]));
+
+            // Store attachments for sender email
+            foreach ($attachmentData as $attachment) {
+                $this->storeAttachment($senderEmail, $attachment);
+            }
+
+            // Create second email as 'recipient' (incoming)
+            // Use a modified message_id to avoid unique constraint violation
+            $recipientEmail = Email::create(array_merge($emailData, [
+                'message_id' => $messageId.'-recipient',
+                'bcc_map_type' => 'recipient',
+            ]));
+
+            // Store attachments for recipient email
+            foreach ($attachmentData as $attachment) {
+                $this->storeAttachment($recipientEmail, $attachment);
+            }
+
+            // Return the sender email (primary record)
+            return $senderEmail->fresh('attachments');
+        }
+
+        // Regular email (sender OR recipient, not both)
+        $email = Email::create(array_merge($emailData, [
+            'bcc_map_type' => $bccMapType,
+        ]));
+
+        // Store attachments
+        foreach ($attachmentData as $attachment) {
+            $this->storeAttachment($email, $attachment);
         }
 
         return $email->fresh('attachments');
@@ -273,6 +328,13 @@ class EmailParserService
 
         Storage::disk('local')->put($storagePath, $contentsToStore);
 
+        // Extract text from attachment if possible (PDFs, text files)
+        $extractedText = null;
+        if ($this->textExtractor->canExtract($mimeType)) {
+            $fullPath = Storage::disk('local')->path($storagePath);
+            $extractedText = $this->textExtractor->extractText($fullPath, $mimeType);
+        }
+
         return Attachment::create([
             'email_id' => $email->id,
             'filename' => $filename,
@@ -285,6 +347,77 @@ class EmailParserService
             'storage_disk' => 'local',
             'content_id' => $attachmentData['content_id'] ?? null,
             'is_inline' => $attachmentData['is_inline'] ?? false,
+            'extracted_text' => $extractedText,
         ]);
+    }
+
+    /**
+     * Detect BCC map type based on sender and recipient addresses
+     *
+     * @param  string|null  $fromAddress  Sender email address
+     * @param  array|null  $toAddresses  Recipient email addresses
+     * @return string|null 'sender', 'recipient', 'both', or null
+     */
+    protected function detectBccMapType(?string $fromAddress, ?array $toAddresses): ?string
+    {
+        if (! $fromAddress && ! $toAddresses) {
+            return null;
+        }
+
+        // Extract domain from from_address
+        $fromDomain = $fromAddress ? $this->extractDomain($fromAddress) : null;
+
+        // Extract domains from to_addresses
+        $toDomains = [];
+        if ($toAddresses) {
+            foreach ($toAddresses as $toAddress) {
+                $domain = $this->extractDomain($toAddress);
+                if ($domain) {
+                    $toDomains[] = $domain;
+                }
+            }
+        }
+
+        // Get configured domains from all active IMAP accounts
+        $configuredDomains = \App\Models\ImapAccount::where('is_active', true)
+            ->get()
+            ->map(fn ($account) => $this->extractDomain($account->username))
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if (empty($configuredDomains)) {
+            return null;
+        }
+
+        // Check if sender is from configured domain (Sender Map)
+        $isSender = $fromDomain && in_array($fromDomain, $configuredDomains);
+
+        // Check if any recipient is from configured domain (Recipient Map)
+        $isRecipient = ! empty(array_intersect($toDomains, $configuredDomains));
+
+        // Determine BCC map type
+        if ($isSender && $isRecipient) {
+            return 'both';
+        } elseif ($isSender) {
+            return 'sender';
+        } elseif ($isRecipient) {
+            return 'recipient';
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract domain from email address
+     */
+    protected function extractDomain(string $email): ?string
+    {
+        if (preg_match('/@([^@]+)$/', $email, $matches)) {
+            return strtolower(trim($matches[1]));
+        }
+
+        return null;
     }
 }
