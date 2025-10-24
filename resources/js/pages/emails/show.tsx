@@ -10,9 +10,9 @@ import { ArrowLeft, Download, FileText, Shield } from 'lucide-react';
 type Email = {
     id: number;
     message_id: string;
-    from_address: string;
+    from_address: string | null;
     from_name: string | null;
-    to_addresses: string[];
+    to_addresses: string[] | null;
     cc_addresses: string[] | null;
     subject: string;
     body_text: string | null;
@@ -109,17 +109,21 @@ export default function EmailShow({ email }: Props) {
                         <Separator />
 
                         <div className="grid gap-3 text-sm">
-                            <div className="grid grid-cols-[100px_1fr] gap-2">
-                                <span className="font-medium text-neutral-500">From:</span>
-                                <span>
-                                    {email.from_name ? `${email.from_name} <${email.from_address}>` : email.from_address}
-                                </span>
-                            </div>
+                            {email.from_address && (
+                                <div className="grid grid-cols-[100px_1fr] gap-2">
+                                    <span className="font-medium text-neutral-500">From:</span>
+                                    <span>
+                                        {email.from_name ? `${email.from_name} <${email.from_address}>` : email.from_address}
+                                    </span>
+                                </div>
+                            )}
 
-                            <div className="grid grid-cols-[100px_1fr] gap-2">
-                                <span className="font-medium text-neutral-500">To:</span>
-                                <span>{email.to_addresses.join(', ')}</span>
-                            </div>
+                            {email.to_addresses && email.to_addresses.length > 0 && (
+                                <div className="grid grid-cols-[100px_1fr] gap-2">
+                                    <span className="font-medium text-neutral-500">To:</span>
+                                    <span>{email.to_addresses.join(', ')}</span>
+                                </div>
+                            )}
 
                             {email.cc_addresses && email.cc_addresses.length > 0 && (
                                 <div className="grid grid-cols-[100px_1fr] gap-2">
@@ -188,16 +192,22 @@ export default function EmailShow({ email }: Props) {
 
                         <div>
                             <h3 className="mb-3 font-medium">Email Content</h3>
-                            {email.body_html ? (
-                                <div
-                                    className="prose prose-sm max-w-none dark:prose-invert"
-                                    dangerouslySetInnerHTML={{ __html: email.body_html }}
-                                />
-                            ) : (
-                                <pre className="whitespace-pre-wrap rounded-md bg-neutral-100 p-4 text-sm dark:bg-neutral-900">
-                                    {email.body_text}
-                                </pre>
-                            )}
+                            <div className="overflow-hidden rounded-lg border border-sidebar-border/70 bg-white dark:border-sidebar-border dark:bg-neutral-950">
+                                {email.body_html ? (
+                                    <div
+                                        className="prose prose-sm max-w-none p-6 dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-img:rounded-lg prose-pre:bg-neutral-100 dark:prose-pre:bg-neutral-900"
+                                        dangerouslySetInnerHTML={{ __html: email.body_html }}
+                                    />
+                                ) : email.body_text ? (
+                                    <pre className="whitespace-pre-wrap p-6 text-sm leading-relaxed text-neutral-900 dark:text-neutral-100">
+                                        {email.body_text}
+                                    </pre>
+                                ) : (
+                                    <div className="p-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                                        No email content available
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {email.audit_logs && email.audit_logs.length > 0 && (

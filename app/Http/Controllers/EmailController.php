@@ -48,6 +48,7 @@ class EmailController extends Controller
     public function show(Email $email): Response
     {
         $email->load('attachments', 'auditLogs.user');
+        $email->makeVisible(['body_html', 'body_text', 'headers']);
 
         AuditLog::log($email, 'viewed', 'Email viewed by user');
 

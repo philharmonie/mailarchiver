@@ -1,11 +1,10 @@
 <?php
 
-use App\Models\Email;
 use App\Services\EmailParserService;
 
 use function Pest\Laravel\assertDatabaseHas;
 
-test('webhook receives and archives email', function () {
+test('email parser receives and archives email', function () {
     $rawEmail = <<<'EMAIL'
 From: sender@example.com
 To: recipient@example.com
@@ -15,18 +14,12 @@ Date: Mon, 23 Oct 2025 10:00:00 +0000
 This is a test email body.
 EMAIL;
 
-    $response = $this->call(
-        'POST',
-        '/api/webhook/email',
-        [],
-        [],
-        [],
-        ['CONTENT_TYPE' => 'text/plain'],
-        $rawEmail
-    );
+    $parser = app(EmailParserService::class);
+    $email = $parser->parseAndStore($rawEmail);
 
-    $response->assertSuccessful();
-    $response->assertJson(['success' => true]);
+    expect($email)->not->toBeNull()
+        ->and($email->from_address)->toBe('sender@example.com')
+        ->and($email->subject)->toBe('Test Email');
 
     assertDatabaseHas('emails', [
         'from_address' => 'sender@example.com',

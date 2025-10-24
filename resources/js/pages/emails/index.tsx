@@ -17,7 +17,7 @@ import { useState } from 'react';
 type Email = {
     id: number;
     message_id: string;
-    from_address: string;
+    from_address: string | null;
     from_name: string | null;
     subject: string;
     received_at: string;
@@ -143,8 +143,10 @@ export default function EmailIndex({ emails, filters }: Props) {
                                         <TableRow key={email.id} className="cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900">
                                             <TableCell>
                                                 <Link href={`/emails/${email.id}`} className="block">
-                                                    <div className="font-medium">{email.from_name || email.from_address}</div>
-                                                    {email.from_name && (
+                                                    <div className="font-medium">
+                                                        {email.from_name || email.from_address || 'Unknown'}
+                                                    </div>
+                                                    {email.from_name && email.from_address && (
                                                         <div className="text-xs text-neutral-500">{email.from_address}</div>
                                                     )}
                                                 </Link>
