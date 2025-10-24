@@ -6,6 +6,7 @@ use App\Models\Attachment;
 use App\Models\Email;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Webklex\PHPIMAP\Message;
 
 class EmailParserService
 {
@@ -36,6 +37,7 @@ class EmailParserService
             'body_html' => $parsed['body_html'],
             'headers' => $parsed['headers'],
             'received_at' => $parsed['received_at'],
+            'archived_at' => now(),
             'size_bytes' => strlen($rawEmail),
             'hash' => Email::generateHash($rawEmail),
             'is_verified' => true,
@@ -46,6 +48,81 @@ class EmailParserService
 
         foreach ($parsed['attachments'] ?? [] as $attachmentData) {
             $this->storeAttachment($email, $attachmentData);
+        }
+
+        return $email->fresh('attachments');
+    }
+
+    /**
+     * Parse and store an email from an IMAP Message object
+     */
+    public function parseAndStoreFromImap(Message $message): Email
+    {
+        // Get raw email for hash and storage
+        $rawEmail = $message->getRawBody();
+
+        // Extract data using IMAP library methods (properly decoded)
+        $from = $message->getFrom();
+        $fromArray = $from ? $from->toArray() : [];
+        $fromAddress = ! empty($fromArray) ? ($fromArray[0]->mail ?? null) : null;
+        $fromName = ! empty($fromArray) ? ($fromArray[0]->personal ?? null) : null;
+
+        $to = $message->getTo();
+        $toArray = $to ? $to->toArray() : [];
+        $toAddresses = ! empty($toArray) ? array_map(fn ($addr) => $addr->mail ?? null, $toArray) : null;
+        $toAddresses = $toAddresses ? array_filter($toAddresses) : null;
+        $toAddresses = $toAddresses && count($toAddresses) > 0 ? array_values($toAddresses) : null;
+
+        $cc = $message->getCc();
+        $ccArray = $cc ? $cc->toArray() : [];
+        $ccAddresses = ! empty($ccArray) ? array_map(fn ($addr) => $addr->mail ?? null, $ccArray) : null;
+        $ccAddresses = $ccAddresses ? array_filter($ccAddresses) : null;
+        $ccAddresses = $ccAddresses && count($ccAddresses) > 0 ? array_values($ccAddresses) : null;
+
+        // Get the email date from the Date header
+        $dateHeader = $message->getDate();
+        $receivedAt = $dateHeader ? $dateHeader->toDate() : now();
+
+        $shouldCompress = $this->compression->shouldCompress(strlen($rawEmail));
+        $rawEmailToStore = $shouldCompress
+            ? $this->compression->compress($rawEmail)
+            : $rawEmail;
+
+        $email = Email::create([
+            'message_id' => $message->getMessageId() ?? '<'.Str::uuid().'@mailarchive.local>',
+            'in_reply_to' => $message->getInReplyTo(),
+            'references' => $message->getReferences() ? explode(' ', $message->getReferences()) : null,
+            'from_address' => $fromAddress,
+            'from_name' => $fromName,
+            'to_addresses' => $toAddresses,
+            'cc_addresses' => $ccAddresses,
+            'bcc_addresses' => null, // BCC is typically not in headers
+            'subject' => $message->getSubject() ?: '(No Subject)',
+            'body_text' => $message->getTextBody(),
+            'body_html' => $message->getHTMLBody(),
+            'headers' => $message->getHeaders()->toArray(),
+            'received_at' => $receivedAt,
+            'archived_at' => now(),
+            'size_bytes' => strlen($rawEmail),
+            'hash' => Email::generateHash($rawEmail),
+            'is_verified' => true,
+            'is_compressed' => $shouldCompress,
+            'raw_email' => $rawEmailToStore,
+            'has_attachments' => $message->hasAttachments(),
+        ]);
+
+        // Store attachments
+        if ($message->hasAttachments()) {
+            $attachments = $message->getAttachments();
+            foreach ($attachments as $attachment) {
+                $this->storeAttachment($email, [
+                    'contents' => $attachment->getContent(),
+                    'filename' => $attachment->getName(),
+                    'mime_type' => $attachment->getMimeType(),
+                    'content_id' => $attachment->getId(),
+                    'is_inline' => $attachment->getDisposition() === 'inline',
+                ]);
+            }
         }
 
         return $email->fresh('attachments');

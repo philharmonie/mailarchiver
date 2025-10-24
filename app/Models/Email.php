@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\CompressionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Laravel\Scout\Searchable;
@@ -14,7 +15,15 @@ class Email extends Model
     /** @use HasFactory<\Database\Factories\EmailFactory> */
     use HasFactory, Searchable;
 
+    protected $hidden = [
+        'raw_email',  // Contains binary/compressed data, not UTF-8 safe
+        'body_html',  // Large field, not needed in list views
+        'body_text',  // Large field, not needed in list views
+        'headers',    // Large array, not needed in list views
+    ];
+
     protected $fillable = [
+        'imap_account_id',
         'message_id',
         'in_reply_to',
         'references',
@@ -28,6 +37,7 @@ class Email extends Model
         'body_html',
         'headers',
         'received_at',
+        'archived_at',
         'size_bytes',
         'hash',
         'is_verified',
@@ -46,11 +56,17 @@ class Email extends Model
             'bcc_addresses' => 'array',
             'headers' => 'array',
             'received_at' => 'datetime',
+            'archived_at' => 'datetime',
             'is_verified' => 'boolean',
             'is_compressed' => 'boolean',
             'has_attachments' => 'boolean',
             'is_archived' => 'boolean',
         ];
+    }
+
+    public function imapAccount(): BelongsTo
+    {
+        return $this->belongsTo(ImapAccount::class);
     }
 
     public function attachments(): HasMany
