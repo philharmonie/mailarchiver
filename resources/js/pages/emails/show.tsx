@@ -88,6 +88,12 @@ export default function EmailShow({ email }: Props) {
                         </Button>
                     </Link>
                     <div className="flex gap-2">
+                        <a href={`/emails/${email.id}/download`}>
+                            <Button variant="outline" size="sm">
+                                <Download className="mr-2 size-4" />
+                                Download .eml
+                            </Button>
+                        </a>
                         {email.is_verified && (
                             <Badge variant="outline" className="gap-1">
                                 <Shield className="size-3" />
@@ -192,10 +198,10 @@ export default function EmailShow({ email }: Props) {
 
                         <div>
                             <h3 className="mb-3 font-medium">Email Content</h3>
-                            <div className="overflow-hidden rounded-lg border border-sidebar-border/70 bg-white dark:border-sidebar-border dark:bg-neutral-950">
+                            <div className="overflow-hidden rounded-lg border border-sidebar-border/70 bg-white dark:border-sidebar-border dark:bg-neutral-900">
                                 {email.body_html ? (
                                     <div
-                                        className="prose prose-sm max-w-none p-6 dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-img:rounded-lg prose-pre:bg-neutral-100 dark:prose-pre:bg-neutral-900"
+                                        className="prose prose-sm max-w-none p-6 text-neutral-900 dark:text-neutral-100 dark:prose-invert prose-headings:font-semibold prose-a:text-blue-600 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-img:rounded-lg prose-pre:bg-neutral-100 dark:prose-pre:bg-neutral-800 [&_*]:!text-inherit"
                                         dangerouslySetInnerHTML={{ __html: email.body_html }}
                                     />
                                 ) : email.body_text ? (

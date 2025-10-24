@@ -24,6 +24,7 @@ class Email extends Model
 
     protected $fillable = [
         'imap_account_id',
+        'bcc_map_type',
         'message_id',
         'in_reply_to',
         'references',
@@ -76,7 +77,7 @@ class Email extends Model
 
     public function auditLogs(): MorphMany
     {
-        return $this->morphMany(AuditLog::class, 'auditable');
+        return $this->morphMany(AuditLog::class, 'auditable')->orderByDesc('created_at');
     }
 
     public function verifyHash(): bool

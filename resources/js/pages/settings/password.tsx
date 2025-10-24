@@ -20,7 +20,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Password() {
+export default function Password({ isAdmin }: { isAdmin: boolean }) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
@@ -32,8 +32,21 @@ export default function Password() {
                 <div className="space-y-6">
                     <HeadingSmall
                         title="Update password"
-                        description="Ensure your account is using a long, random password to stay secure"
+                        description={
+                            isAdmin
+                                ? "Ensure your account is using a long, random password to stay secure"
+                                : "IMAP users cannot change their password here"
+                        }
                     />
+
+                    {!isAdmin && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                                Your account uses IMAP authentication. To change your password,
+                                please change it in your mailbox or contact your administrator.
+                            </p>
+                        </div>
+                    )}
 
                     <Form
                         {...PasswordController.update.form()}
@@ -72,6 +85,7 @@ export default function Password() {
                                         className="mt-1 block w-full"
                                         autoComplete="current-password"
                                         placeholder="Current password"
+                                        disabled={!isAdmin}
                                     />
 
                                     <InputError
@@ -92,6 +106,7 @@ export default function Password() {
                                         className="mt-1 block w-full"
                                         autoComplete="new-password"
                                         placeholder="New password"
+                                        disabled={!isAdmin}
                                     />
 
                                     <InputError message={errors.password} />
@@ -109,6 +124,7 @@ export default function Password() {
                                         className="mt-1 block w-full"
                                         autoComplete="new-password"
                                         placeholder="Confirm password"
+                                        disabled={!isAdmin}
                                     />
 
                                     <InputError
@@ -116,26 +132,28 @@ export default function Password() {
                                     />
                                 </div>
 
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        disabled={processing}
-                                        data-test="update-password-button"
-                                    >
-                                        Save password
-                                    </Button>
+                                {isAdmin && (
+                                    <div className="flex items-center gap-4">
+                                        <Button
+                                            disabled={processing}
+                                            data-test="update-password-button"
+                                        >
+                                            Save password
+                                        </Button>
 
-                                    <Transition
-                                        show={recentlySuccessful}
-                                        enter="transition ease-in-out"
-                                        enterFrom="opacity-0"
-                                        leave="transition ease-in-out"
-                                        leaveTo="opacity-0"
-                                    >
-                                        <p className="text-sm text-neutral-600">
-                                            Saved
-                                        </p>
-                                    </Transition>
-                                </div>
+                                        <Transition
+                                            show={recentlySuccessful}
+                                            enter="transition ease-in-out"
+                                            enterFrom="opacity-0"
+                                            leave="transition ease-in-out"
+                                            leaveTo="opacity-0"
+                                        >
+                                            <p className="text-sm text-neutral-600">
+                                                Saved
+                                            </p>
+                                        </Transition>
+                                    </div>
+                                )}
                             </>
                         )}
                     </Form>

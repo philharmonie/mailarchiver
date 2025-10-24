@@ -57,9 +57,9 @@ class ImapService
     }
 
     /**
-     * Fetch and archive new emails from the configured folder
+     * Fetch and archive emails from the configured folder
      */
-    public function fetchAndArchiveEmails(?int $limit = null, bool $fetchAll = false, ?callable $progressCallback = null): array
+    public function fetchAndArchiveEmails(?int $limit = null, ?callable $progressCallback = null): array
     {
         if (! isset($this->client) || ! isset($this->currentAccount)) {
             throw new \RuntimeException('Must connect to an account first using connectToAccount()');
@@ -69,14 +69,9 @@ class ImapService
 
         $query = $folder->query();
 
-        // Fetch either all or just unseen emails
-        if ($fetchAll) {
-            // Fetch all emails (using ALL criterion)
-            $query->whereAll();
-        } else {
-            // Only fetch unseen emails
-            $query->unseen();
-        }
+        // Always fetch all emails for BCC archive approach
+        // We don't want to miss any emails based on read/unread status
+        $query->whereAll();
 
         if ($limit) {
             $query->limit($limit);
@@ -100,6 +95,39 @@ class ImapService
 
             try {
                 $email = $this->archiveMessage($message);
+
+                // If null, email is a duplicate (already archived)
+                if (! $email) {
+                    Log::debug('Email already archived (duplicate), skipping', [
+                        'account' => $this->currentAccount->name,
+                        'message_id' => $message->getMessageId(),
+                    ]);
+
+                    // Delete from server if configured (even for duplicates)
+                    if ($this->currentAccount->delete_after_archive) {
+                        try {
+                            $message->delete();
+                            Log::info('Duplicate email deleted from server', [
+                                'account' => $this->currentAccount->name,
+                                'message_id' => $message->getMessageId(),
+                            ]);
+                        } catch (\Exception $deleteError) {
+                            Log::error('Failed to delete duplicate email from server', [
+                                'account' => $this->currentAccount->name,
+                                'message_id' => $message->getMessageId(),
+                                'error' => $deleteError->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    // Call progress callback for duplicate (no error)
+                    if ($progressCallback) {
+                        $progressCallback($current, $totalMessages, null, null, true);
+                    }
+
+                    continue;
+                }
+
                 $archived[] = [
                     'email_id' => $email->id,
                     'message_id' => $email->message_id,
@@ -108,11 +136,31 @@ class ImapService
 
                 $totalSize += $email->size_bytes;
 
-                // Mark as seen after successful archiving
-                $message->setFlag('Seen');
-
                 // Update account statistics immediately
                 $this->currentAccount->incrementStats(1, $email->size_bytes);
+
+                // Delete from server if configured (opt-in)
+                if ($this->currentAccount->delete_after_archive) {
+                    try {
+                        $message->delete();
+
+                        Log::info('Email deleted from server after archival', [
+                            'account' => $this->currentAccount->name,
+                            'email_id' => $email->id,
+                            'message_id' => $email->message_id,
+                        ]);
+
+                        // Audit log for deletion
+                        \App\Models\AuditLog::log($email, 'deleted_from_server', 'Email deleted from IMAP server after successful archival');
+                    } catch (\Exception $deleteError) {
+                        // Log deletion error but don't fail the archival
+                        Log::error('Failed to delete email from server after archival', [
+                            'account' => $this->currentAccount->name,
+                            'email_id' => $email->id,
+                            'error' => $deleteError->getMessage(),
+                        ]);
+                    }
+                }
 
                 // Call progress callback if provided
                 if ($progressCallback) {
@@ -143,11 +191,18 @@ class ImapService
 
     /**
      * Archive a single IMAP message
+     *
+     * @return \App\Models\Email|null Returns null if email is a duplicate
      */
-    protected function archiveMessage(Message $message): \App\Models\Email
+    protected function archiveMessage(Message $message): ?\App\Models\Email
     {
         // Use the IMAP-specific parser that properly extracts headers
         $email = $this->emailParser->parseAndStoreFromImap($message);
+
+        // If null, email already exists (duplicate)
+        if (! $email) {
+            return null;
+        }
 
         // Associate with current IMAP account
         $email->update(['imap_account_id' => $this->currentAccount->id]);

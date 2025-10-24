@@ -110,7 +110,10 @@ export default function ImapAccountIndex({ accounts }: Props) {
                                         <div className="flex justify-between text-sm">
                                             <span className="text-neutral-500 dark:text-neutral-400">Last Fetch:</span>
                                             <span className="font-medium">
-                                                {new Date(account.last_fetch_at).toLocaleDateString('de-DE')}
+                                                {new Date(account.last_fetch_at).toLocaleString('de-DE', {
+                                                    dateStyle: 'short',
+                                                    timeStyle: 'short'
+                                                })}
                                             </span>
                                         </div>
                                     )}

@@ -24,6 +24,8 @@ export default function CreateImapAccount() {
         password: '',
         folder: 'INBOX',
         is_active: true,
+        delete_after_archive: false,
+        sync_interval: null,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -165,6 +167,48 @@ export default function CreateImapAccount() {
                                     Active
                                 </Label>
                             </div>
+                        </div>
+
+                        <div className="rounded-lg border p-4">
+                            <label htmlFor="delete_after_archive" className="flex cursor-pointer items-start gap-3">
+                                <input
+                                    id="delete_after_archive"
+                                    type="checkbox"
+                                    checked={data.delete_after_archive}
+                                    onChange={(e) => setData('delete_after_archive', e.target.checked)}
+                                    className="mt-0.5 size-4 rounded border-neutral-300"
+                                />
+                                <div className="flex-1 space-y-1">
+                                    <div className="text-base font-bold text-red-600 dark:text-red-500">
+                                        Delete emails from server after archival
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        When enabled, emails will be permanently deleted from the IMAP server after successful archival.
+                                        This saves server storage space, as archived emails are safely stored in the GoBD-compliant archive.
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="sync_interval">Automatic Sync Interval</Label>
+                            <select
+                                id="sync_interval"
+                                value={data.sync_interval || ''}
+                                onChange={(e) => setData('sync_interval', e.target.value || null)}
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                                <option value="">Manual only (no automatic sync)</option>
+                                <option value="every_15_minutes">Every 15 minutes</option>
+                                <option value="hourly">Every hour</option>
+                                <option value="every_6_hours">Every 6 hours</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                            </select>
+                            <p className="text-sm text-muted-foreground">
+                                Automatically sync emails at the selected interval. Leave as "Manual only" to sync manually via command line.
+                            </p>
+                            {errors.sync_interval && <p className="text-sm text-red-600">{errors.sync_interval}</p>}
                         </div>
 
                         <div className="flex justify-end gap-2">

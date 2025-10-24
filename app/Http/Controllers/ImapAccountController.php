@@ -54,6 +54,8 @@ class ImapAccountController extends Controller
             'password' => 'required|string',
             'folder' => 'required|string|max:255',
             'is_active' => 'boolean',
+            'delete_after_archive' => 'boolean',
+            'sync_interval' => 'nullable|in:every_15_minutes,hourly,every_6_hours,daily,weekly',
         ]);
 
         ImapAccount::create($validated);
@@ -75,6 +77,8 @@ class ImapAccountController extends Controller
                 'username' => $imapAccount->username,
                 'folder' => $imapAccount->folder,
                 'is_active' => $imapAccount->is_active,
+                'delete_after_archive' => $imapAccount->delete_after_archive,
+                'sync_interval' => $imapAccount->sync_interval,
             ],
         ]);
     }
@@ -91,6 +95,8 @@ class ImapAccountController extends Controller
             'password' => 'nullable|string',
             'folder' => 'required|string|max:255',
             'is_active' => 'boolean',
+            'delete_after_archive' => 'boolean',
+            'sync_interval' => 'nullable|in:every_15_minutes,hourly,every_6_hours,daily,weekly',
         ]);
 
         // Only update password if provided
