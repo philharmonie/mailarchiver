@@ -34,7 +34,7 @@ export default function EmailExport({ emailCount }: Props) {
     const [to, setTo] = useState('');
     const [isExporting, setIsExporting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = () => {
         setIsExporting(true);
         // Form will submit normally, reset state after a delay
         setTimeout(() => setIsExporting(false), 2000);
