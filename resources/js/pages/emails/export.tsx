@@ -3,11 +3,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { Download, FileArchive } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { gobd } from '@/routes/export';
+import { useState } from 'react';
 
 type Props = {
     emailCount: number;
@@ -25,18 +25,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function EmailExport({ emailCount }: Props) {
-    const { data, setData, post, processing } = useForm({
-        from: '',
-        to: '',
-    });
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(gobd.url());
+    // Get CSRF token from cookie
+    const getCsrfToken = () => {
+        const name = 'XSRF-TOKEN=';
+        const decodedCookie = decodeURIComponent(document.cookie);
+        const cookies = decodedCookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.indexOf(name) === 0) {
+                return decodeURIComponent(cookie.substring(name.length));
+            }
+        }
+        return '';
+    };
+
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        setIsExporting(true);
+        // Form will submit normally, reset state after a delay
+        setTimeout(() => setIsExporting(false), 2000);
     };
 
     const handleExportAll = () => {
-        post(gobd.url());
+        setIsExporting(true);
+        const form = document.getElementById('export-all-form') as HTMLFormElement;
+        form.submit();
+        setTimeout(() => setIsExporting(false), 2000);
     };
 
     return (
@@ -59,6 +76,11 @@ export default function EmailExport({ emailCount }: Props) {
                     </AlertDescription>
                 </Alert>
 
+                {/* Hidden form for "Export All" */}
+                <form id="export-all-form" method="POST" action="/export" style={{ display: 'none' }}>
+                    <input type="hidden" name="_token" value={getCsrfToken()} />
+                </form>
+
                 <div className="grid gap-6 md:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -73,12 +95,12 @@ export default function EmailExport({ emailCount }: Props) {
                         <CardContent>
                             <Button
                                 onClick={handleExportAll}
-                                disabled={processing || emailCount === 0}
+                                disabled={isExporting || emailCount === 0}
                                 size="lg"
                                 className="w-full"
                             >
                                 <Download className="mr-2 size-4" />
-                                {processing ? 'Exportiere...' : 'Alle Emails exportieren'}
+                                {isExporting ? 'Exportiere...' : 'Alle Emails exportieren'}
                             </Button>
                         </CardContent>
                     </Card>
@@ -94,14 +116,17 @@ export default function EmailExport({ emailCount }: Props) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form method="POST" action="/export" onSubmit={handleSubmit} className="space-y-4">
+                                <input type="hidden" name="_token" value={getCsrfToken()} />
+
                                 <div>
                                     <Label htmlFor="from">Von (Datum)</Label>
                                     <Input
                                         id="from"
+                                        name="from"
                                         type="date"
-                                        value={data.from}
-                                        onChange={(e) => setData('from', e.target.value)}
+                                        value={from}
+                                        onChange={(e) => setFrom(e.target.value)}
                                         className="mt-1"
                                     />
                                 </div>
@@ -110,16 +135,17 @@ export default function EmailExport({ emailCount }: Props) {
                                     <Label htmlFor="to">Bis (Datum)</Label>
                                     <Input
                                         id="to"
+                                        name="to"
                                         type="date"
-                                        value={data.to}
-                                        onChange={(e) => setData('to', e.target.value)}
+                                        value={to}
+                                        onChange={(e) => setTo(e.target.value)}
                                         className="mt-1"
                                     />
                                 </div>
 
-                                <Button type="submit" disabled={processing} size="lg" className="w-full">
+                                <Button type="submit" disabled={isExporting} size="lg" className="w-full">
                                     <Download className="mr-2 size-4" />
-                                    {processing ? 'Exportiere...' : 'Zeitraum exportieren'}
+                                    {isExporting ? 'Exportiere...' : 'Zeitraum exportieren'}
                                 </Button>
                             </form>
                         </CardContent>
