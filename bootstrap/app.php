@@ -30,6 +30,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => IsAdmin::class,
         ]);
+
+        // Trust proxies for HTTPS detection
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
