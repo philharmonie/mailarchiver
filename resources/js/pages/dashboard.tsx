@@ -21,6 +21,14 @@ type AdminStats = {
     active_accounts: number;
 };
 
+type AccountStat = {
+    name: string;
+    username: string;
+    is_active: boolean;
+    emails_count: number;
+    total_size: number;
+};
+
 type UserStats = {
     total_emails: number;
     total_size_bytes: number;
@@ -30,7 +38,8 @@ type UserStats = {
 
 type Props = {
     stats: AdminStats | UserStats;
-    recent_emails: RecentEmail[];
+    recent_emails?: RecentEmail[];
+    account_stats?: AccountStat[];
     is_admin: boolean;
 };
 
@@ -58,7 +67,7 @@ const formatDate = (date: string) => {
     });
 };
 
-export default function Dashboard({ stats, recent_emails, is_admin }: Props) {
+export default function Dashboard({ stats, recent_emails = [], account_stats = [], is_admin }: Props) {
     // Admin Dashboard
     if (is_admin) {
         const adminStats = stats as AdminStats;
@@ -122,6 +131,50 @@ export default function Dashboard({ stats, recent_emails, is_admin }: Props) {
                             </div>
                         </Card>
                     </div>
+
+                    {account_stats.length > 0 && (
+                        <Card className="p-6">
+                            <div className="mb-4">
+                                <h2 className="text-lg font-semibold">Top Accounts by Email Count</h2>
+                                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                                    Top 10 IMAP accounts with the most archived emails
+                                </p>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="border-b border-sidebar-border/70 dark:border-sidebar-border">
+                                        <tr className="text-left">
+                                            <th className="pb-3 font-medium text-neutral-500 dark:text-neutral-400">Account</th>
+                                            <th className="pb-3 font-medium text-neutral-500 dark:text-neutral-400">Username</th>
+                                            <th className="pb-3 text-right font-medium text-neutral-500 dark:text-neutral-400">Emails</th>
+                                            <th className="pb-3 text-right font-medium text-neutral-500 dark:text-neutral-400">Size</th>
+                                            <th className="pb-3 text-center font-medium text-neutral-500 dark:text-neutral-400">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
+                                        {account_stats.map((account, index) => (
+                                            <tr key={index} className="hover:bg-neutral-50 dark:hover:bg-neutral-900/50">
+                                                <td className="py-3 font-medium">{account.name}</td>
+                                                <td className="py-3 text-neutral-600 dark:text-neutral-400">{account.username}</td>
+                                                <td className="py-3 text-right font-medium">{account.emails_count.toLocaleString()}</td>
+                                                <td className="py-3 text-right text-neutral-600 dark:text-neutral-400">{formatBytes(account.total_size)}</td>
+                                                <td className="py-3 text-center">
+                                                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                                        account.is_active
+                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                            : 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300'
+                                                    }`}>
+                                                        {account.is_active ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    )}
                 </div>
             </AppLayout>
         );
