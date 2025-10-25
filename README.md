@@ -11,7 +11,7 @@
 
 ## ✨ Why MailArchive?
 
-MailArchive is the **only open-source email archiving solution** specifically designed for **German tax compliance (GoBD)**. Whether you're a small business, freelancer, or enterprise, MailArchive ensures your emails are properly archived, tamper-proof, and audit-ready.
+MailArchive is an **open-source email archiving solution** specifically designed for **German tax compliance (GoBD)**. Whether you're a small business, freelancer, or enterprise, MailArchive ensures your emails are properly archived, tamper-proof, and audit-ready.
 
 ### 🎯 Perfect For
 
@@ -26,17 +26,17 @@ MailArchive is the **only open-source email archiving solution** specifically de
 ## 🚀 Key Features
 
 ### 📋 GoBD Compliance
-- ✅ **Vollständigkeit** - Complete archiving of all emails
-- ✅ **Unveränderbarkeit** - Tamper-proof with SHA256 checksums
-- ✅ **Nachvollziehbarkeit** - Full audit trail with timestamps
-- ✅ **Maschinelle Auswertung** - XML/CSV exports for tax audits
-- ✅ **Lesbarkeit** - Standard .eml format readable in any email client
+- ✅ **Completeness** - Complete archiving of all emails
+- ✅ **Immutability** - Tamper-proof with SHA256 checksums
+- ✅ **Traceability** - Full audit trail with timestamps
+- ✅ **Machine Readability** - XML/CSV exports for tax audits
+- ✅ **Readability** - Standard .eml format readable in any email client
 
 ### 🔐 Security & Integrity
 - **SHA256 Hash Verification** - Every email is cryptographically verified
 - **Tamper Detection** - Automatic detection of modified emails
 - **Audit Logging** - Complete history of all actions
-- **Role-Based Access Control** - Admin and user roles with fine-grained permissions
+- **Role-Based Access Control** - Admin and user roles
 - **Data Compression** - Automatic gzip compression for large emails
 
 ### 📨 Email Management
@@ -75,30 +75,6 @@ MailArchive is the **only open-source email archiving solution** specifically de
 
 ---
 
-## 🛠️ Tech Stack
-
-### Backend
-- **[Laravel 12](https://laravel.com)** - The PHP framework for web artisans
-- **[Laravel Fortify](https://laravel.com/docs/fortify)** - Frontend-agnostic authentication
-- **[Laravel Scout](https://laravel.com/docs/scout)** - Full-text search with Meilisearch
-- **[webklex/php-imap](https://github.com/Webklex/php-imap)** - IMAP library for PHP
-- **MySQL/PostgreSQL** - Rock-solid database options
-
-### Frontend
-- **[React 19](https://react.dev)** - Modern, component-based UI
-- **[Inertia.js 2.0](https://inertiajs.com)** - The modern monolith
-- **[TypeScript](https://typescriptlang.org)** - Type safety for JavaScript
-- **[Tailwind CSS 4](https://tailwindcss.com)** - Utility-first CSS framework
-- **[shadcn/ui](https://ui.shadcn.com)** - Beautiful, accessible components
-- **[Laravel Wayfinder](https://github.com/claudiodekker/laravel-wayfinder)** - Type-safe routing
-
-### Testing & Quality
-- **[Pest](https://pestphp.com)** - Delightful PHP testing framework
-- **[Laravel Pint](https://laravel.com/docs/pint)** - Opinionated PHP code formatter
-- **72+ Tests** - Comprehensive test coverage
-
----
-
 ## 📦 Installation
 
 ### Prerequisites
@@ -113,7 +89,7 @@ MailArchive is the **only open-source email archiving solution** specifically de
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mailarchive.git
+git clone https://github.com/philharmonie/mailarchive.git
 cd mailarchive
 
 # Install PHP dependencies
@@ -136,8 +112,8 @@ php artisan key:generate
 # DB_USERNAME=root
 # DB_PASSWORD=
 
-# Run migrations
-php artisan migrate
+# Run migrations and seed test user
+php artisan migrate --seed
 
 # Build frontend assets
 npm run build
@@ -146,11 +122,15 @@ npm run build
 php artisan serve
 ```
 
-Visit `http://localhost:8000` and create your admin account!
+Visit `http://localhost:8000` and login with:
+- **Email**: `test@example.com`
+- **Password**: `password`
+
+**⚠️ IMPORTANT**: Change the default password immediately after first login!
 
 ### Production Deployment
 
-For production, we recommend using **[Laravel Forge](https://forge.laravel.com)** or **[Ploi](https://ploi.io)** for zero-configuration deployment.
+For production, we recommend using **[Laravel Forge](https://forge.laravel.com)** for zero-configuration deployment.
 
 <details>
 <summary>Manual Production Setup</summary>
@@ -221,8 +201,7 @@ MailArchive automatically archives emails based on the sync interval configured 
 
 1. **Add IMAP Accounts** - Configure email accounts to archive
 2. **Monitor Dashboard** - See real-time statistics and top accounts
-3. **Manage Users** - Create user accounts for email access
-4. **Review Audit Logs** - Full transparency of all actions
+3. **Review Audit Logs** - Full transparency of all actions
 
 ### For Users
 
@@ -300,10 +279,7 @@ See [LICENSE.md](LICENSE.md) for full details.
 
 ## 📞 Support
 
-- **Documentation**: [Coming Soon]
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mailarchive/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/mailarchive/discussions)
-- **Email**: support@mailarchive.example.com
+- **Issues**: [GitHub Issues](https://github.com/philharmonie/mailarchive/issues)
 
 ---
 
@@ -320,18 +296,8 @@ See [LICENSE.md](LICENSE.md) for full details.
 
 ---
 
-## ⭐ Star History
-
-If you find MailArchive useful, please consider giving it a star! It helps us grow and improve.
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/mailarchive&type=Date)](https://star-history.com/#yourusername/mailarchive&Date)
-
----
-
 <div align="center">
 
 **Built with ❤️ for the Laravel community**
-
-[Website](https://mailarchive.example.com) • [Documentation](https://docs.mailarchive.example.com) • [Twitter](https://twitter.com/mailarchive)
 
 </div>

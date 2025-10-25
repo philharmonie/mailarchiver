@@ -130,11 +130,11 @@ Major updates may require additional steps. Always check the [upgrade guide](UPG
 ## Support
 
 For questions about specific releases:
-- **Changelog**: https://github.com/yourusername/mailarchive/blob/main/CHANGELOG.md
-- **Releases**: https://github.com/yourusername/mailarchive/releases
-- **Issues**: https://github.com/yourusername/mailarchive/issues
+- **Changelog**: https://github.com/philharmonie/mailarchive/blob/main/CHANGELOG.md
+- **Releases**: https://github.com/philharmonie/mailarchive/releases
+- **Issues**: https://github.com/philharmonie/mailarchive/issues
 
 ---
 
-[Unreleased]: https://github.com/yourusername/mailarchive/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/yourusername/mailarchive/releases/tag/v1.0.0
+[Unreleased]: https://github.com/philharmonie/mailarchive/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/philharmonie/mailarchive/releases/tag/v1.0.0
