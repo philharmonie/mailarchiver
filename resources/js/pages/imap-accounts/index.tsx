@@ -100,7 +100,7 @@ export default function ImapAccountIndex({ accounts }: Props) {
                                 <div className="mt-4 space-y-2 border-t border-sidebar-border/70 pt-4 dark:border-sidebar-border">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-neutral-500 dark:text-neutral-400">Total Emails:</span>
-                                        <span className="font-medium">{account.total_emails.toLocaleString()}</span>
+                                        <span className="font-medium">{account.emails_count.toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-neutral-500 dark:text-neutral-400">Total Size:</span>

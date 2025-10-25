@@ -20,12 +20,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $user = $request->user();
         $isAdmin = $user->isAdmin();
 
-        // Admins see only global statistics
+        // Admins see global statistics and per-account breakdown
         if ($isAdmin) {
             $totalEmails = App\Models\Email::count();
             $totalSize = App\Models\Email::sum('size_bytes');
             $totalAccounts = App\Models\ImapAccount::count();
             $activeAccounts = App\Models\ImapAccount::where('is_active', true)->count();
+
+            // Get stats per IMAP account
+            $accountStats = App\Models\ImapAccount::withCount('emails')
+                ->selectRaw('id, name, username, is_active')
+                ->selectRaw('(SELECT SUM(size_bytes) FROM emails WHERE emails.imap_account_id = imap_accounts.id) as total_size')
+                ->orderByDesc('emails_count')
+                ->limit(10)
+                ->get()
+                ->map(function ($account) {
+                    return [
+                        'name' => $account->name,
+                        'username' => $account->username,
+                        'is_active' => $account->is_active,
+                        'emails_count' => $account->emails_count,
+                        'total_size' => $account->total_size ?? 0,
+                    ];
+                });
 
             return Inertia::render('dashboard', [
                 'stats' => [
@@ -34,14 +51,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'total_accounts' => $totalAccounts,
                     'active_accounts' => $activeAccounts,
                 ],
+                'account_stats' => $accountStats,
                 'is_admin' => true,
             ]);
         }
 
-        // Regular users see only their email stats
+        // Regular users see only their email stats (respecting bcc_map_type)
         $userEmailsQuery = App\Models\Email::where(function ($q) use ($user) {
-            $q->where('from_address', $user->email)
-                ->orWhereJsonContains('to_addresses', $user->email);
+            // sender type: only show if user is sender
+            $q->where(function ($subQ) use ($user) {
+                $subQ->where('bcc_map_type', 'sender')
+                    ->where('from_address', $user->email);
+            })
+                // recipient type: only show if user is recipient
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'recipient')
+                        ->where(function ($recipientQ) use ($user) {
+                            $recipientQ->whereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                // both type: show if user is sender or recipient
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'both')
+                        ->where(function ($bothQ) use ($user) {
+                            $bothQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                // null/old emails: fallback to old behavior
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->whereNull('bcc_map_type')
+                        ->where(function ($nullQ) use ($user) {
+                            $nullQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email);
+                        });
+                });
         });
 
         $totalEmails = $userEmailsQuery->count();
