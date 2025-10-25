@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { Download, FileArchive } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,10 @@ import { useState } from 'react';
 
 type Props = {
     emailCount: number;
+};
+
+type PageProps = {
+    csrf_token: string;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,23 +29,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function EmailExport({ emailCount }: Props) {
+    const { csrf_token } = usePage<PageProps>().props;
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
     const [isExporting, setIsExporting] = useState(false);
-
-    // Get CSRF token from cookie
-    const getCsrfToken = () => {
-        const name = 'XSRF-TOKEN=';
-        const decodedCookie = decodeURIComponent(document.cookie);
-        const cookies = decodedCookie.split(';');
-        for (let cookie of cookies) {
-            cookie = cookie.trim();
-            if (cookie.indexOf(name) === 0) {
-                return decodeURIComponent(cookie.substring(name.length));
-            }
-        }
-        return '';
-    };
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         setIsExporting(true);
@@ -78,7 +69,7 @@ export default function EmailExport({ emailCount }: Props) {
 
                 {/* Hidden form for "Export All" */}
                 <form id="export-all-form" method="POST" action="/export" style={{ display: 'none' }}>
-                    <input type="hidden" name="_token" value={getCsrfToken()} />
+                    <input type="hidden" name="_token" value={csrf_token} />
                 </form>
 
                 <div className="grid gap-6 md:grid-cols-2">
@@ -117,7 +108,7 @@ export default function EmailExport({ emailCount }: Props) {
                         </CardHeader>
                         <CardContent>
                             <form method="POST" action="/export" onSubmit={handleSubmit} className="space-y-4">
-                                <input type="hidden" name="_token" value={getCsrfToken()} />
+                                <input type="hidden" name="_token" value={csrf_token} />
 
                                 <div>
                                     <Label htmlFor="from">Von (Datum)</Label>
