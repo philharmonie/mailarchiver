@@ -132,7 +132,7 @@ protected function casts(): array
 ## Security Advisories
 
 Security advisories will be published at:
-https://github.com/yourusername/mailarchive/security/advisories
+https://github.com/philharmonie/mailarchive/security/advisories
 
 Subscribe to our security announcements:
 - **GitHub Watch**: Watch the repository for security advisories

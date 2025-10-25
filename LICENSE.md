@@ -137,7 +137,7 @@ The following uses are explicitly **permitted** without requiring a commercial l
 ## Modifications to This License
 
 The copyright holders reserve the right to update this license. Updates will be published at:
-https://github.com/yourusername/mailarchive/blob/main/LICENSE.md
+https://github.com/philharmonie/mailarchive/blob/main/LICENSE.md
 
 Continued use of the software after license updates constitutes acceptance of the new terms.
 
@@ -158,7 +158,7 @@ This license constitutes the entire agreement between you and the copyright hold
 ## Contact
 
 For questions about this license, please contact:
-- **GitHub Issues**: https://github.com/yourusername/mailarchive/issues
+- **GitHub Issues**: https://github.com/philharmonie/mailarchive/issues
 - **Email**: legal@mailarchive.example.com
 
 ---
