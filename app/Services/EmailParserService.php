@@ -69,8 +69,10 @@ class EmailParserService
             return null;
         }
 
-        // Get raw email for hash and storage
-        $rawEmail = $message->getRawBody();
+        // Get raw email for hash and storage (header + body)
+        $rawHeader = $message->getHeader()->raw ?? '';
+        $rawBody = $message->getRawBody();
+        $rawEmail = $rawHeader."\r\n\r\n".$rawBody;
 
         // Extract data using IMAP library methods (properly decoded)
         $from = $message->getFrom();
