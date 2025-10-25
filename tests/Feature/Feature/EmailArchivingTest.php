@@ -84,6 +84,11 @@ test('internal email creates two separate records (sender and recipient)', funct
     $message = \Mockery::mock(\Webklex\PHPIMAP\Message::class);
     $message->shouldReceive('getMessageId')->andReturn('<internal-test@testdomain.com>');
     $message->shouldReceive('getRawBody')->andReturn('From: user1@testdomain.com...');
+
+    // Mock header object
+    $header = \Mockery::mock(\Webklex\PHPIMAP\Header::class);
+    $header->raw = "From: user1@testdomain.com\r\nTo: user2@testdomain.com\r\nSubject: Internal Test Email\r\n";
+    $message->shouldReceive('getHeader')->andReturn($header);
     $message->shouldReceive('getFrom')->andReturn(collect([
         (object) ['mail' => 'user1@testdomain.com', 'personal' => 'User One'],
     ]));
@@ -133,6 +138,11 @@ test('external sender email creates only sender record', function () {
     $message = \Mockery::mock(\Webklex\PHPIMAP\Message::class);
     $message->shouldReceive('getMessageId')->andReturn('<sender-test@testdomain.com>');
     $message->shouldReceive('getRawBody')->andReturn('From: sender@testdomain.com...');
+
+    // Mock header object
+    $header = \Mockery::mock(\Webklex\PHPIMAP\Header::class);
+    $header->raw = "From: sender@testdomain.com\r\nTo: external@example.com\r\nSubject: Sender Test\r\n";
+    $message->shouldReceive('getHeader')->andReturn($header);
     $message->shouldReceive('getFrom')->andReturn(collect([
         (object) ['mail' => 'sender@testdomain.com', 'personal' => null],
     ]));
@@ -168,6 +178,11 @@ test('external recipient email creates only recipient record', function () {
     $message = \Mockery::mock(\Webklex\PHPIMAP\Message::class);
     $message->shouldReceive('getMessageId')->andReturn('<recipient-test@example.com>');
     $message->shouldReceive('getRawBody')->andReturn('From: external@example.com...');
+
+    // Mock header object
+    $header = \Mockery::mock(\Webklex\PHPIMAP\Header::class);
+    $header->raw = "From: external@example.com\r\nTo: recipient@testdomain.com\r\nSubject: Recipient Test\r\n";
+    $message->shouldReceive('getHeader')->andReturn($header);
     $message->shouldReceive('getFrom')->andReturn(collect([
         (object) ['mail' => 'external@example.com', 'personal' => null],
     ]));
@@ -203,6 +218,11 @@ test('duplicate email is not stored twice', function () {
     $message = \Mockery::mock(\Webklex\PHPIMAP\Message::class);
     $message->shouldReceive('getMessageId')->andReturn('<duplicate-test@example.com>');
     $message->shouldReceive('getRawBody')->andReturn('From: sender@example.com...');
+
+    // Mock header object
+    $header = \Mockery::mock(\Webklex\PHPIMAP\Header::class);
+    $header->raw = "From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Duplicate Test\r\n";
+    $message->shouldReceive('getHeader')->andReturn($header);
     $message->shouldReceive('getFrom')->andReturn(collect([
         (object) ['mail' => 'sender@example.com', 'personal' => null],
     ]));
