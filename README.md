@@ -1,177 +1,101 @@
-# 📧 MailArchive - GoBD-Compliant Email Archiving System
+# MailArchive - Email Archiving System
 
 [![License](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](LICENSE.md)
 [![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel)](https://laravel.com)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![Inertia](https://img.shields.io/badge/Inertia-2.0-9553E9)](https://inertiajs.com)
 
-> **Professional email archiving made simple.** A modern, self-hosted email archiving solution built for German tax compliance (GoBD) with enterprise-grade features and a beautiful user interface.
+An open-source email archiving system built with Laravel and React. This project aims to provide GoBD-compliant email archiving for German businesses.
+
+**⚠️ Project Status**: This is a work in progress. GoBD compliance is a goal, not yet fully implemented. Contributions are welcome!
 
 ---
 
-## ✨ Why MailArchive?
+## Features
 
-MailArchive is an **open-source email archiving solution** specifically designed for **German tax compliance (GoBD)**. Whether you're a small business, freelancer, or enterprise, MailArchive ensures your emails are properly archived, tamper-proof, and audit-ready.
+### Email Archiving
+- **IMAP Integration** - Connect multiple IMAP accounts (Gmail, Outlook, custom servers)
+- **Automatic Syncing** - Scheduled email fetching with configurable intervals (15min, hourly, daily, weekly)
+- **Deduplication** - Attachment deduplication to reduce storage usage
+- **Compression** - Automatic gzip compression for emails over 10KB
+- **BCC Mapping** - Handles internal vs. external email classification
 
-### 🎯 Perfect For
+### Security & Data Integrity
+- **SHA256 Checksums** - Every email stored with cryptographic hash
+- **Tamper Detection** - Hash verification to detect modifications
+- **Encrypted Credentials** - IMAP passwords encrypted at rest using Laravel encryption
+- **Audit Logging** - Database logging of all system actions
+- **Role-Based Access** - Admin and user roles with different permissions
 
-- **German Businesses** requiring GoBD-compliant email archiving
-- **Tax Consultants** managing multiple client accounts
-- **Law Firms** needing secure, immutable email records
-- **Healthcare Providers** requiring GDPR-compliant email storage
-- **Freelancers** who need professional email archiving on a budget
+### Search & Access
+- **Full-Text Search** - Optional Meilisearch integration for fast searching
+- **Database Search** - Fallback search using MySQL/PostgreSQL full-text search
+- **Filtering** - Filter emails by sender, recipient, subject, date range
+- **Access Control** - Users can only access emails where they are sender or recipient
 
----
+### Export
+- **Individual Downloads** - Download emails as .eml files
+- **Bulk Export** - Export all emails or date ranges as ZIP archives
+- **XML Metadata** - Exports include XML index files
+- **CSV Support** - Machine-readable CSV format included in exports
 
-## 🚀 Key Features
-
-### 📋 GoBD Compliance
-- ✅ **Completeness** - Complete archiving of all emails
-- ✅ **Immutability** - Tamper-proof with SHA256 checksums
-- ✅ **Traceability** - Full audit trail with timestamps
-- ✅ **Machine Readability** - XML/CSV exports for tax audits
-- ✅ **Readability** - Standard .eml format readable in any email client
-
-### 🔐 Security & Integrity
-- **SHA256 Hash Verification** - Every email is cryptographically verified
-- **Tamper Detection** - Automatic detection of modified emails
-- **Audit Logging** - Complete history of all actions
-- **Role-Based Access Control** - Admin and user roles
-- **Data Compression** - Automatic gzip compression for large emails
-
-### 📨 Email Management
-- **Multi-Account Support** - Connect multiple IMAP accounts (Gmail, Outlook, etc.)
-- **Automatic Archiving** - Scheduled fetching via configurable intervals
-- **Full-Text Search** - Lightning-fast search with Meilisearch/Scout
-- **Smart Filtering** - Filter by sender, recipient, date, and more
-- **Attachment Deduplication** - Save storage with intelligent deduplication
-- **BCC Map Support** - Proper handling of internal vs. external emails
-
-### 📤 Export & Compliance
-- **One-Click GoBD Export** - Generate audit-ready ZIP archives
-- **XML/CSV Metadata** - Machine-readable indexes for tax authorities
-- **Integrity Verification** - Includes SHA256 hashes for verification
-- **Date Range Exports** - Export specific time periods
-- **User-Specific Exports** - Users can export their own emails
-
-### 🎨 Modern User Experience
-- **Beautiful Dark Mode** - Easy on the eyes, works perfectly in dark environments
-- **Responsive Design** - Works flawlessly on desktop, tablet, and mobile
-- **Real-Time Updates** - See archiving progress in real-time
-- **Intuitive Interface** - No training required, just works
-- **Type-Safe Frontend** - Built with TypeScript and React 19
+### User Interface
+- **Dark Mode** - Light/dark theme support
+- **Responsive Design** - Works on desktop, tablet, and mobile
+- **TypeScript** - Type-safe React frontend with Inertia.js
+- **Real-Time Stats** - Dashboard with email counts and storage statistics
 
 ---
 
-## 📸 Screenshots
-
-> *Screenshots coming soon - see it in action!*
-
-<!--
-![Dashboard](docs/screenshots/dashboard.png)
-![Email List](docs/screenshots/emails.png)
-![IMAP Accounts](docs/screenshots/imap-accounts.png)
--->
-
----
-
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
-- **PHP 8.3+** with required extensions (mbstring, pdo, openssl, etc.)
-- **Composer 2.0+**
-- **Node.js 20+** and npm
-- **MySQL 8.0+** or **PostgreSQL 14+**
-- **Meilisearch** (optional, for full-text search)
+- PHP 8.3+
+- Composer 2.0+
+- Node.js 20+
+- MySQL 8.0+ or PostgreSQL 14+
+- Meilisearch (optional, for full-text search)
 
-### Quick Start
+### Setup
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/philharmonie/mailarchive.git
 cd mailarchive
 
-# Install PHP dependencies
+# Install dependencies
 composer install
-
-# Install JavaScript dependencies
 npm install
 
-# Copy environment file
+# Environment configuration
 cp .env.example .env
-
-# Generate application key
 php artisan key:generate
 
-# Configure your database in .env
+# Configure database in .env
 # DB_CONNECTION=mysql
 # DB_HOST=127.0.0.1
-# DB_PORT=3306
 # DB_DATABASE=mailarchive
 # DB_USERNAME=root
 # DB_PASSWORD=
 
-# Run migrations and seed test user
+# Run migrations with test user
 php artisan migrate --seed
 
-# Build frontend assets
+# Build frontend
 npm run build
 
-# Start the development server
+# Start server
 php artisan serve
 ```
 
-Visit `http://localhost:8000` and login with:
-- **Email**: `test@example.com`
-- **Password**: `password`
+Login at `http://localhost:8000`:
+- Email: `test@example.com`
+- Password: `password`
 
-**⚠️ IMPORTANT**: Change the default password immediately after first login!
+**⚠️ Change the default password immediately!**
 
-### Production Deployment
-
-For production, we recommend using **[Laravel Forge](https://forge.laravel.com)** for zero-configuration deployment.
-
-<details>
-<summary>Manual Production Setup</summary>
-
-```bash
-# Optimize for production
-composer install --optimize-autoloader --no-dev
-npm run build
-
-# Cache configuration
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-
-# Set up queue worker
-php artisan queue:work --daemon
-
-# Set up scheduler (add to crontab)
-* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
-```
-
-</details>
-
----
-
-## ⚙️ Configuration
-
-### IMAP Setup
-
-1. Navigate to **IMAP Accounts** in the admin panel
-2. Click **Add Account**
-3. Enter your IMAP credentials:
-   - **Gmail**: `imap.gmail.com:993` (SSL)
-   - **Outlook**: `outlook.office365.com:993` (SSL)
-   - **Custom**: Your IMAP server details
-4. Configure sync interval (15min, hourly, daily, etc.)
-5. Test the connection and save
-
-### Meilisearch (Optional)
-
-For lightning-fast full-text search, install Meilisearch:
+### Optional: Meilisearch Setup
 
 ```bash
 # Install Meilisearch
@@ -189,115 +113,182 @@ MEILISEARCH_KEY=YOUR_MASTER_KEY
 php artisan scout:import "App\Models\Email"
 ```
 
-### Scheduled Archiving
+### Production
 
-MailArchive automatically archives emails based on the sync interval configured for each IMAP account. The scheduler runs every 15 minutes and checks which accounts need syncing.
+```bash
+# Optimize
+composer install --optimize-autoloader --no-dev
+npm run build
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
 
----
+# Queue worker
+php artisan queue:work --daemon
 
-## 📖 Usage
-
-### For Admins
-
-1. **Add IMAP Accounts** - Configure email accounts to archive
-2. **Monitor Dashboard** - See real-time statistics and top accounts
-3. **Review Audit Logs** - Full transparency of all actions
-
-### For Users
-
-1. **Browse Emails** - Search and filter your archived emails
-2. **View Details** - Read email content, view attachments
-3. **Download .eml Files** - Export individual emails
-4. **GoBD Export** - Generate compliant ZIP archives for tax audits
+# Scheduler (add to crontab)
+* * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
+```
 
 ---
 
-## 🧪 Testing
+## Configuration
+
+### IMAP Accounts
+
+1. Navigate to **IMAP Accounts** (admin only)
+2. Add account with credentials:
+   - **Host**: `imap.gmail.com:993` (Gmail), `outlook.office365.com:993` (Outlook), or custom
+   - **Username**: Email address
+   - **Password**: IMAP password or app-specific password
+   - **SSL**: Enabled for port 993
+3. Set sync interval
+4. Test connection
+
+### BCC Map (Optional)
+
+To properly classify internal emails, create a BCC map table in your database listing internal email addresses.
+
+---
+
+## Usage
+
+### Admin Functions
+- Add/edit/delete IMAP accounts
+- View system-wide statistics
+- Access audit logs
+- View all accounts and email counts
+
+### User Functions
+- Search and filter archived emails
+- View email content and attachments
+- Download individual emails as .eml files
+- Export emails to ZIP archives
+
+---
+
+## Testing
 
 ```bash
 # Run all tests
 php artisan test
 
-# Run specific test suite
+# Run specific test
 php artisan test --filter=EmailArchivingTest
 
-# Run with coverage (requires Xdebug)
+# With coverage (requires Xdebug)
 php artisan test --coverage
 ```
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-We love contributions! Here's how you can help:
+Contributions are welcome! This project aims to build a robust, GoBD-compliant email archiving solution.
 
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
-4. **Push to the branch** (`git push origin feature/amazing-feature`)
-5. **Open a Pull Request**
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes
+4. Run tests: `php artisan test`
+5. Run linter: `vendor/bin/pint`
+6. Commit: `git commit -m 'Add feature'`
+7. Push: `git push origin feature/your-feature`
+8. Open a Pull Request
 
 ### Development Guidelines
 
-- Follow **PSR-12** coding standards (enforced by Pint)
-- Write **tests** for new features
-- Update **documentation** as needed
-- Keep commits **atomic** and descriptive
-- Ensure all tests pass before submitting
+- Follow PSR-12 coding standards (enforced by Pint)
+- Write tests for new features
+- Update documentation
+- Keep commits atomic and descriptive
+- All tests must pass
+
+### Areas Needing Work
+
+- **GoBD Compliance Certification** - Legal review and certification
+- **Retention Policies** - Automatic deletion after retention periods
+- **Advanced Export Formats** - MBOX, PST support
+- **Email Parsing** - Improved handling of edge cases
+- **Performance** - Optimization for large archives (millions of emails)
+- **Documentation** - User guides, API documentation
 
 ---
 
-## 📄 License
+## Roadmap
+
+### GoBD Compliance (Priority)
+- [ ] Legal review of compliance requirements
+- [ ] Implement retention period enforcement
+- [ ] Enhanced audit trail with complete change history
+- [ ] Export format validation and certification
+- [ ] Documentation for tax auditors
+
+### Features
+- [ ] S3/Object storage backend
+- [ ] Microsoft 365 Graph API integration
+- [ ] Multi-tenancy support
+- [ ] RESTful API
+- [ ] Webhook notifications
+- [ ] Advanced search operators
+
+### Technical Improvements
+- [ ] Horizontal scaling support
+- [ ] Read replicas for search
+- [ ] Background job optimization
+- [ ] Monitoring and alerting
+- [ ] Backup/restore functionality
+
+---
+
+## Tech Stack
+
+- **Backend**: Laravel 12, PHP 8.3
+- **Frontend**: React 19, TypeScript, Inertia.js 2.0, Tailwind CSS 4
+- **Database**: MySQL 8.0+ / PostgreSQL 14+
+- **Search**: Meilisearch (optional) or database full-text search
+- **Queue**: Laravel Queue (database/redis)
+- **Email**: Webklex PHP-IMAP library
+
+---
+
+## License
 
 This project is licensed under the **Non-Commercial Open Source License**.
 
-**You are free to:**
-- ✅ Use the software for personal, educational, or internal business purposes
-- ✅ Modify and adapt the code for your needs
-- ✅ Study and learn from the codebase
+**Permitted**:
+- Personal, educational, or internal business use
+- Modification and adaptation
+- Study and learning
 
-**You may NOT:**
-- ❌ Sell the software or offer it as a commercial service
-- ❌ Use the software in a commercial product without permission
-- ❌ Remove or modify the license or copyright notices
+**Prohibited**:
+- Commercial sale or SaaS offerings
+- Use in commercial products without permission
+- Removing license/copyright notices
 
-For commercial licensing inquiries, please contact us.
-
-See [LICENSE.md](LICENSE.md) for full details.
+See [LICENSE.md](LICENSE.md) for details. For commercial licensing, please contact the project maintainers.
 
 ---
 
-## 🙏 Acknowledgments
+## Security
 
-- **[Laravel](https://laravel.com)** - For making PHP development a joy
-- **[Inertia.js](https://inertiajs.com)** - For the perfect SPA experience
-- **[shadcn/ui](https://ui.shadcn.com)** - For beautiful UI components
-- **[Webklex](https://github.com/Webklex)** - For the excellent IMAP library
-- **German Tax Authorities** - For GoBD compliance requirements that inspired this project
+Please report security vulnerabilities privately via GitHub Security Advisories or email the project maintainers. Do not open public issues for security bugs.
+
+See [SECURITY.md](SECURITY.md) for details.
 
 ---
 
-## 📞 Support
+## Acknowledgments
+
+- [Laravel](https://laravel.com) - PHP framework
+- [Inertia.js](https://inertiajs.com) - Modern monolith approach
+- [shadcn/ui](https://ui.shadcn.com) - UI components
+- [Webklex/php-imap](https://github.com/Webklex/php-imap) - IMAP library
+
+---
+
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/philharmonie/mailarchive/issues)
-
----
-
-## 🗺️ Roadmap
-
-- [ ] **S3/Object Storage Support** - Archive to cloud storage
-- [ ] **Microsoft 365 Integration** - Native Graph API support
-- [ ] **Advanced Search Filters** - More granular search options
-- [ ] **Multi-Tenancy** - Multiple organizations in one installation
-- [ ] **Email Templates** - Customizable export templates
-- [ ] **RESTful API** - Programmatic access to archives
-- [ ] **Mobile Apps** - Native iOS and Android apps
-- [ ] **Backup/Restore** - Built-in backup functionality
-
----
-
-<div align="center">
-
-**Built with ❤️ for the Laravel community**
-
-</div>
+- **Discussions**: Use issues for questions and feature requests
