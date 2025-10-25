@@ -10,6 +10,24 @@ use Inertia\Response;
 
 class EmailController extends Controller
 {
+    /**
+     * Check if user is authorized to access this email based on bcc_map_type
+     */
+    protected function isUserAuthorizedForEmail(Email $email, string $userEmail): bool
+    {
+        $isSender = $email->from_address === $userEmail;
+        $isRecipient = (is_array($email->to_addresses) && in_array($userEmail, $email->to_addresses))
+            || (is_array($email->cc_addresses) && in_array($userEmail, $email->cc_addresses))
+            || (is_array($email->bcc_addresses) && in_array($userEmail, $email->bcc_addresses));
+
+        return match ($email->bcc_map_type) {
+            'sender' => $isSender,
+            'recipient' => $isRecipient,
+            'both' => $isSender || $isRecipient,
+            default => $isSender || $isRecipient, // Fallback for null/old emails
+        };
+    }
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -23,10 +41,40 @@ class EmailController extends Controller
             ->with('attachments:id,email_id,filename,size_bytes,mime_type')
             ->orderBy('received_at', 'desc');
 
-        // Filter emails to show only those where user is sender or recipient
+        // Filter emails based on bcc_map_type
         $query->where(function ($q) use ($user) {
-            $q->where('from_address', $user->email)
-                ->orWhereJsonContains('to_addresses', $user->email);
+            // sender type: only show if user is sender
+            $q->where(function ($subQ) use ($user) {
+                $subQ->where('bcc_map_type', 'sender')
+                    ->where('from_address', $user->email);
+            })
+                // recipient type: only show if user is recipient
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'recipient')
+                        ->where(function ($recipientQ) use ($user) {
+                            $recipientQ->whereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                // both type: show if user is sender or recipient
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'both')
+                        ->where(function ($bothQ) use ($user) {
+                            $bothQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                // null/old emails: fallback to old behavior
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->whereNull('bcc_map_type')
+                        ->where(function ($nullQ) use ($user) {
+                            $nullQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email);
+                        });
+                });
         });
 
         if ($request->filled('search')) {
@@ -37,10 +85,9 @@ class EmailController extends Controller
                 // Get all matching email IDs via Scout
                 $searchResults = Email::search($search)->take(1000)->get();
 
-                // Filter by user ownership
+                // Filter by user ownership and bcc_map_type
                 $emailIds = $searchResults->filter(function ($email) use ($user) {
-                    return $email->from_address === $user->email
-                        || (is_array($email->to_addresses) && in_array($user->email, $email->to_addresses));
+                    return $this->isUserAuthorizedForEmail($email, $user->email);
                 })->pluck('id')->toArray();
 
                 if (! empty($emailIds)) {
@@ -88,11 +135,8 @@ class EmailController extends Controller
             abort(403, 'Admins cannot view email details. Only statistics are available on the dashboard.');
         }
 
-        // Check if user is authorized to view this email (sender or recipient)
-        $isAuthorized = $email->from_address === $user->email
-            || (is_array($email->to_addresses) && in_array($user->email, $email->to_addresses));
-
-        if (! $isAuthorized) {
+        // Check if user is authorized to view this email based on bcc_map_type
+        if (! $this->isUserAuthorizedForEmail($email, $user->email)) {
             abort(403, 'You are not authorized to view this email.');
         }
 
@@ -115,11 +159,8 @@ class EmailController extends Controller
             abort(403, 'Admins cannot download emails.');
         }
 
-        // Check if user is authorized to download this email
-        $isAuthorized = $email->from_address === $user->email
-            || (is_array($email->to_addresses) && in_array($user->email, $email->to_addresses));
-
-        if (! $isAuthorized) {
+        // Check if user is authorized to download this email based on bcc_map_type
+        if (! $this->isUserAuthorizedForEmail($email, $user->email)) {
             abort(403, 'You are not authorized to download this email.');
         }
 
