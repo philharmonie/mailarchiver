@@ -74,6 +74,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('emails', [App\Http\Controllers\EmailController::class, 'index'])->name('emails.index');
     Route::get('emails/{email}', [App\Http\Controllers\EmailController::class, 'show'])->name('emails.show');
     Route::get('emails/{email}/download', [App\Http\Controllers\EmailController::class, 'download'])->name('emails.download');
+
+    // GoBD Export
+    Route::get('export', [App\Http\Controllers\EmailController::class, 'exportPage'])->name('export');
+    Route::post('export', [App\Http\Controllers\EmailController::class, 'exportGobd'])->name('export.gobd');
 });
 
 // Admin-only: IMAP Account Management

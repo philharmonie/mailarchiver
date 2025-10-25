@@ -21,13 +21,14 @@ class GobdExportService
      * @param  Carbon|null  $dateFrom  Start date (inclusive)
      * @param  Carbon|null  $dateTo  End date (inclusive)
      * @param  string|null  $outputPath  Output path for ZIP file (defaults to storage/app/exports/)
+     * @param  string|null  $userEmail  Optional: Filter by user email (sender or recipient)
      * @return array{success: bool, file: string|null, count: int, size: int, error: string|null}
      */
-    public function export(?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $outputPath = null): array
+    public function export(?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $outputPath = null, ?string $userEmail = null): array
     {
         try {
             // Get emails in date range
-            $emails = $this->getEmailsInDateRange($dateFrom, $dateTo);
+            $emails = $this->getEmailsInDateRange($dateFrom, $dateTo, $userEmail);
 
             if ($emails->isEmpty()) {
                 return [
@@ -86,7 +87,7 @@ class GobdExportService
     /**
      * Get emails in date range
      */
-    protected function getEmailsInDateRange(?Carbon $dateFrom, ?Carbon $dateTo): Collection
+    protected function getEmailsInDateRange(?Carbon $dateFrom, ?Carbon $dateTo, ?string $userEmail = null): Collection
     {
         $query = Email::query()
             ->orderBy('received_at', 'asc')
@@ -98,6 +99,44 @@ class GobdExportService
 
         if ($dateTo) {
             $query->where('received_at', '<=', $dateTo);
+        }
+
+        // Filter by user email (respecting bcc_map_type authorization)
+        if ($userEmail) {
+            $query->where(function ($q) use ($userEmail) {
+                // sender type: only show if user is sender
+                $q->where(function ($subQ) use ($userEmail) {
+                    $subQ->where('bcc_map_type', 'sender')
+                        ->where('from_address', $userEmail);
+                })
+                    // recipient type: only show if user is recipient
+                    ->orWhere(function ($subQ) use ($userEmail) {
+                        $subQ->where('bcc_map_type', 'recipient')
+                            ->where(function ($recipientQ) use ($userEmail) {
+                                $recipientQ->whereJsonContains('to_addresses', $userEmail)
+                                    ->orWhereJsonContains('cc_addresses', $userEmail)
+                                    ->orWhereJsonContains('bcc_addresses', $userEmail);
+                            });
+                    })
+                    // both type: show if user is sender or recipient
+                    ->orWhere(function ($subQ) use ($userEmail) {
+                        $subQ->where('bcc_map_type', 'both')
+                            ->where(function ($bothQ) use ($userEmail) {
+                                $bothQ->where('from_address', $userEmail)
+                                    ->orWhereJsonContains('to_addresses', $userEmail)
+                                    ->orWhereJsonContains('cc_addresses', $userEmail)
+                                    ->orWhereJsonContains('bcc_addresses', $userEmail);
+                            });
+                    })
+                    // null/old emails: fallback to old behavior
+                    ->orWhere(function ($subQ) use ($userEmail) {
+                        $subQ->whereNull('bcc_map_type')
+                            ->where(function ($nullQ) use ($userEmail) {
+                                $nullQ->where('from_address', $userEmail)
+                                    ->orWhereJsonContains('to_addresses', $userEmail);
+                            });
+                    });
+            });
         }
 
         return $query->get();

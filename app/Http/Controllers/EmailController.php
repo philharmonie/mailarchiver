@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Email;
+use App\Services\GobdExportService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -182,5 +184,93 @@ class EmailController extends Controller
             ->header('Content-Type', 'message/rfc822')
             ->header('Content-Disposition', 'attachment; filename="'.$filename.'"')
             ->header('Content-Length', strlen($rawEmail));
+    }
+
+    public function exportPage(Request $request): Response
+    {
+        $user = $request->user();
+
+        // Admin cannot export emails
+        if ($user->isAdmin()) {
+            abort(403, 'Admins cannot export emails.');
+        }
+
+        // Get email count for user
+        $emailCount = Email::where(function ($q) use ($user) {
+            $q->where(function ($subQ) use ($user) {
+                $subQ->where('bcc_map_type', 'sender')
+                    ->where('from_address', $user->email);
+            })
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'recipient')
+                        ->where(function ($recipientQ) use ($user) {
+                            $recipientQ->whereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->where('bcc_map_type', 'both')
+                        ->where(function ($bothQ) use ($user) {
+                            $bothQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email)
+                                ->orWhereJsonContains('cc_addresses', $user->email)
+                                ->orWhereJsonContains('bcc_addresses', $user->email);
+                        });
+                })
+                ->orWhere(function ($subQ) use ($user) {
+                    $subQ->whereNull('bcc_map_type')
+                        ->where(function ($nullQ) use ($user) {
+                            $nullQ->where('from_address', $user->email)
+                                ->orWhereJsonContains('to_addresses', $user->email);
+                        });
+                });
+        })->count();
+
+        return Inertia::render('emails/export', [
+            'emailCount' => $emailCount,
+        ]);
+    }
+
+    public function exportGobd(Request $request, GobdExportService $exportService)
+    {
+        $user = $request->user();
+
+        // Admin cannot export emails
+        if ($user->isAdmin()) {
+            abort(403, 'Admins cannot export emails.');
+        }
+
+        $request->validate([
+            'from' => 'nullable|date',
+            'to' => 'nullable|date|after_or_equal:from',
+        ]);
+
+        $dateFrom = $request->filled('from') ? Carbon::parse($request->input('from'))->startOfDay() : null;
+        $dateTo = $request->filled('to') ? Carbon::parse($request->input('to'))->endOfDay() : null;
+
+        // Export emails for this user only
+        $result = $exportService->export($dateFrom, $dateTo, null, $user->email);
+
+        if (! $result['success']) {
+            return back()->with('error', $result['error']);
+        }
+
+        // Log the export
+        AuditLog::create([
+            'auditable_type' => 'App\Models\User',
+            'auditable_id' => $user->id,
+            'user_id' => $user->id,
+            'action' => 'gobd_export',
+            'description' => sprintf(
+                'User exported %d emails (GoBD-compliant) from %s to %s',
+                $result['count'],
+                $dateFrom ? $dateFrom->format('Y-m-d') : 'beginning',
+                $dateTo ? $dateTo->format('Y-m-d') : 'today'
+            ),
+        ]);
+
+        // Return the file for download
+        return response()->download($result['file'])->deleteFileAfterSend(true);
     }
 }

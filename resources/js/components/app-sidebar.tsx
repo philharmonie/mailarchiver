@@ -12,7 +12,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutGrid, Mail, Server } from 'lucide-react';
+import { FileArchive, LayoutGrid, Mail, Server } from 'lucide-react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
@@ -29,6 +29,11 @@ export function AppSidebar() {
             title: 'Emails',
             href: '/emails',
             icon: Mail,
+        }] : []),
+        ...(!isAdmin ? [{
+            title: 'Export',
+            href: '/export',
+            icon: FileArchive,
         }] : []),
         ...(isAdmin ? [{
             title: 'IMAP Accounts',
