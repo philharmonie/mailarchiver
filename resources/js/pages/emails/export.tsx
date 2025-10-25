@@ -7,6 +7,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { Download, FileArchive } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { gobd } from '@/routes/export';
 
 type Props = {
     emailCount: number;
@@ -31,11 +32,11 @@ export default function EmailExport({ emailCount }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('export.gobd'));
+        post(gobd.url());
     };
 
     const handleExportAll = () => {
-        post(route('export.gobd'));
+        post(gobd.url());
     };
 
     return (
