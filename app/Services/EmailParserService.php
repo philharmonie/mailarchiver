@@ -299,6 +299,16 @@ class EmailParserService
         $contents = $attachmentData['contents'];
         $filename = $attachmentData['filename'];
         $mimeType = $attachmentData['mime_type'] ?? 'application/octet-stream';
+        $size = strlen($contents);
+
+        // For large attachments (>5MB), use memory-efficient processing
+        $largeAttachmentThreshold = 5 * 1024 * 1024; // 5MB
+
+        if ($size > $largeAttachmentThreshold) {
+            return $this->storeLargeAttachment($email, $attachmentData, $contents, $filename, $mimeType, $size);
+        }
+
+        // Regular processing for smaller attachments
         $hash = Attachment::generateHash($contents);
 
         $existingAttachment = Attachment::findByHash($hash);
@@ -321,7 +331,7 @@ class EmailParserService
             ]);
         }
 
-        $shouldCompress = $this->compression->shouldCompress(strlen($contents));
+        $shouldCompress = $this->compression->shouldCompress($size);
         $contentsToStore = $shouldCompress
             ? $this->compression->compress($contents)
             : $contents;
@@ -341,7 +351,102 @@ class EmailParserService
             'email_id' => $email->id,
             'filename' => $filename,
             'mime_type' => $mimeType,
-            'size_bytes' => strlen($contents),
+            'size_bytes' => $size,
+            'hash' => $hash,
+            'is_compressed' => $shouldCompress,
+            'reference_count' => 1,
+            'storage_path' => $storagePath,
+            'storage_disk' => 'local',
+            'content_id' => $attachmentData['content_id'] ?? null,
+            'is_inline' => $attachmentData['is_inline'] ?? false,
+            'extracted_text' => $extractedText,
+        ]);
+    }
+
+    /**
+     * Store large attachments using memory-efficient streaming
+     * Prevents memory exhaustion when processing attachments >5MB
+     */
+    protected function storeLargeAttachment(
+        Email $email,
+        array $attachmentData,
+        string $contents,
+        string $filename,
+        string $mimeType,
+        int $size
+    ): Attachment {
+        // Calculate hash for deduplication
+        $hash = Attachment::generateHash($contents);
+
+        // Check if this attachment already exists (deduplication)
+        $existingAttachment = Attachment::findByHash($hash);
+
+        if ($existingAttachment) {
+            // Free memory immediately
+            unset($contents);
+            gc_collect_cycles();
+
+            $existingAttachment->incrementReferenceCount();
+
+            return Attachment::create([
+                'email_id' => $email->id,
+                'filename' => $filename,
+                'mime_type' => $mimeType,
+                'size_bytes' => $existingAttachment->size_bytes,
+                'hash' => $hash,
+                'is_compressed' => $existingAttachment->is_compressed,
+                'reference_count' => 1,
+                'storage_path' => $existingAttachment->storage_path,
+                'storage_disk' => $existingAttachment->storage_disk,
+                'content_id' => $attachmentData['content_id'] ?? null,
+                'is_inline' => $attachmentData['is_inline'] ?? false,
+            ]);
+        }
+
+        // Write directly to storage without keeping in memory
+        $storagePath = 'attachments/'.date('Y/m/d').'/'.Str::uuid().'_'.$filename;
+
+        // Determine if we should compress (but don't do it yet for large files)
+        $shouldCompress = $this->compression->shouldCompress($size);
+
+        if ($shouldCompress) {
+            // Compress in-place and write
+            $compressed = $this->compression->compress($contents);
+            Storage::disk('local')->put($storagePath, $compressed);
+
+            // Free memory immediately after writing
+            unset($contents, $compressed);
+            gc_collect_cycles();
+        } else {
+            // Write uncompressed
+            Storage::disk('local')->put($storagePath, $contents);
+
+            // Free memory immediately after writing
+            unset($contents);
+            gc_collect_cycles();
+        }
+
+        // Extract text from attachment if possible (PDFs, text files)
+        // This happens AFTER freeing the original content from memory
+        $extractedText = null;
+        if ($this->textExtractor->canExtract($mimeType)) {
+            $fullPath = Storage::disk('local')->path($storagePath);
+            $extractedText = $this->textExtractor->extractText($fullPath, $mimeType);
+        }
+
+        \Illuminate\Support\Facades\Log::info('Large attachment stored successfully', [
+            'email_id' => $email->id,
+            'filename' => $filename,
+            'size_mb' => round($size / 1024 / 1024, 2),
+            'compressed' => $shouldCompress,
+            'storage_path' => $storagePath,
+        ]);
+
+        return Attachment::create([
+            'email_id' => $email->id,
+            'filename' => $filename,
+            'mime_type' => $mimeType,
+            'size_bytes' => $size,
             'hash' => $hash,
             'is_compressed' => $shouldCompress,
             'reference_count' => 1,
