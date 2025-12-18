@@ -4,15 +4,16 @@ use App\Http\Controllers\Api\MailcowWebhookController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 // Mailcow BCC Webhook - receives emails in real-time
-use Laravel\Fortify\Features;
 
 Route::post('/api/webhook/mailcow', [MailcowWebhookController::class, 'handle'])
     ->name('api.webhook.mailcow');
 
 Route::get('/', function () {
-    return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return redirect()->route('login');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
