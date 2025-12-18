@@ -94,7 +94,21 @@ class EmailParserService
 
         // Get the email date from the Date header
         $dateHeader = $message->getDate();
-        $receivedAt = $dateHeader ? $dateHeader->toDate() : now();
+        $receivedAt = now(); // Default to current time
+
+        if ($dateHeader) {
+            try {
+                $parsedDate = $dateHeader->toDate();
+                // Validate the date is reasonable (after 1990 and not in the future)
+                if ($parsedDate &&
+                    $parsedDate->getTimestamp() > strtotime('1990-01-01') &&
+                    $parsedDate->getTimestamp() <= time() + 86400) {
+                    $receivedAt = $parsedDate;
+                }
+            } catch (\Exception $e) {
+                // Keep default (now()) if date parsing fails
+            }
+        }
 
         $shouldCompress = $this->compression->shouldCompress(strlen($rawEmail));
         $rawEmailToStore = $shouldCompress
