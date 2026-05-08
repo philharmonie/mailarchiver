@@ -21,6 +21,11 @@ class SyncImapAccountsCommand extends Command
 
     public function handle(): int
     {
+        // Mailbox sync streams full message bodies through the parser; the
+        // default 512M ceiling is not enough for accounts with thousands of
+        // messages. Allow override via MONITORING_SYNC_MEMORY_LIMIT.
+        ini_set('memory_limit', (string) config('monitoring.sync_memory_limit'));
+
         $specificInterval = $this->option('interval');
 
         // Get accounts that need syncing

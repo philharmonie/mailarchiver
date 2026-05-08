@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'notify_email' => env('MONITORING_NOTIFY_EMAIL'),
+    'notify_email' => env('MONITORING_NOTIFY_EMAIL') ?: null,
 
     /*
     |--------------------------------------------------------------------------
@@ -29,9 +29,9 @@ return [
     |
     */
 
-    'heartbeat_url' => env('MONITORING_HEARTBEAT_URL'),
+    'heartbeat_url' => env('MONITORING_HEARTBEAT_URL') ?: null,
 
-    'heartbeat_url_fail' => env('MONITORING_HEARTBEAT_URL_FAIL'),
+    'heartbeat_url_fail' => env('MONITORING_HEARTBEAT_URL_FAIL') ?: null,
 
     /*
     |--------------------------------------------------------------------------
@@ -45,5 +45,19 @@ return [
     */
 
     'stale_threshold_minutes' => (int) env('MONITORING_STALE_THRESHOLD_MINUTES', 60),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sync Memory Limit
+    |--------------------------------------------------------------------------
+    |
+    | PHP memory_limit applied at the start of `imap:sync`. Mailbox parsing
+    | streams full message bodies, so 512M is often too tight for archiving
+    | thousands of messages. Format follows php.ini conventions ("1024M",
+    | "2G", "-1" for unlimited).
+    |
+    */
+
+    'sync_memory_limit' => env('MONITORING_SYNC_MEMORY_LIMIT', '1024M'),
 
 ];
