@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\MailcowWebhookController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+
 // Mailcow BCC Webhook - receives emails in real-time
 
 Route::post('/api/webhook/mailcow', [MailcowWebhookController::class, 'handle'])
@@ -30,7 +31,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             // Get stats per IMAP account
             $accountStats = App\Models\ImapAccount::withCount('emails')
-                ->selectRaw('id, name, username, is_active')
+                ->selectRaw('id, name, username, is_active, last_sync_at')
                 ->selectRaw('(SELECT SUM(size_bytes) FROM emails WHERE emails.imap_account_id = imap_accounts.id) as total_size')
                 ->orderByDesc('emails_count')
                 ->limit(10)
@@ -42,6 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         'is_active' => $account->is_active,
                         'emails_count' => $account->emails_count,
                         'total_size' => $account->total_size ?? 0,
+                        'last_sync_at' => optional($account->last_sync_at)->toIso8601String(),
                     ];
                 });
 
@@ -53,6 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'active_accounts' => $activeAccounts,
                 ],
                 'account_stats' => $accountStats,
+                'stale_threshold_minutes' => config('monitoring.stale_threshold_minutes'),
                 'is_admin' => true,
             ]);
         }

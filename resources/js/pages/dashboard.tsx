@@ -27,6 +27,7 @@ type AccountStat = {
     is_active: boolean;
     emails_count: number;
     total_size: number;
+    last_sync_at: string | null;
 };
 
 type UserStats = {
@@ -40,6 +41,7 @@ type Props = {
     stats: AdminStats | UserStats;
     recent_emails?: RecentEmail[];
     account_stats?: AccountStat[];
+    stale_threshold_minutes?: number;
     is_admin: boolean;
 };
 
@@ -67,7 +69,25 @@ const formatDate = (date: string) => {
     });
 };
 
-export default function Dashboard({ stats, recent_emails = [], account_stats = [], is_admin }: Props) {
+const formatRelative = (iso: string | null) => {
+    if (!iso) return 'Never';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+};
+
+const isStale = (iso: string | null, thresholdMinutes: number) => {
+    if (!iso) return true;
+    const diffMs = Date.now() - new Date(iso).getTime();
+    return diffMs > thresholdMinutes * 60_000;
+};
+
+export default function Dashboard({ stats, recent_emails = [], account_stats = [], stale_threshold_minutes = 60, is_admin }: Props) {
     // Admin Dashboard
     if (is_admin) {
         const adminStats = stats as AdminStats;
@@ -149,27 +169,44 @@ export default function Dashboard({ stats, recent_emails = [], account_stats = [
                                             <th className="pb-3 font-medium text-neutral-500 dark:text-neutral-400">Username</th>
                                             <th className="pb-3 text-right font-medium text-neutral-500 dark:text-neutral-400">Emails</th>
                                             <th className="pb-3 text-right font-medium text-neutral-500 dark:text-neutral-400">Size</th>
+                                            <th className="pb-3 text-right font-medium text-neutral-500 dark:text-neutral-400">Last Sync</th>
                                             <th className="pb-3 text-center font-medium text-neutral-500 dark:text-neutral-400">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
-                                        {account_stats.map((account, index) => (
+                                        {account_stats.map((account, index) => {
+                                            const stale = account.is_active && isStale(account.last_sync_at, stale_threshold_minutes);
+                                            return (
                                             <tr key={index} className="hover:bg-neutral-50 dark:hover:bg-neutral-900/50">
                                                 <td className="py-3 font-medium">{account.name}</td>
                                                 <td className="py-3 text-neutral-600 dark:text-neutral-400">{account.username}</td>
                                                 <td className="py-3 text-right font-medium">{account.emails_count.toLocaleString()}</td>
                                                 <td className="py-3 text-right text-neutral-600 dark:text-neutral-400">{formatBytes(account.total_size)}</td>
+                                                <td
+                                                    className={`py-3 text-right ${
+                                                        stale
+                                                            ? 'font-medium text-red-600 dark:text-red-400'
+                                                            : 'text-neutral-600 dark:text-neutral-400'
+                                                    }`}
+                                                    title={account.last_sync_at ?? undefined}
+                                                    data-test={stale ? 'account-stale' : 'account-fresh'}
+                                                >
+                                                    {formatRelative(account.last_sync_at)}
+                                                </td>
                                                 <td className="py-3 text-center">
                                                     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                        account.is_active
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                            : 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300'
+                                                        !account.is_active
+                                                            ? 'bg-neutral-100 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-300'
+                                                            : stale
+                                                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                                     }`}>
-                                                        {account.is_active ? 'Active' : 'Inactive'}
+                                                        {!account.is_active ? 'Inactive' : stale ? 'Stale' : 'Active'}
                                                     </span>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

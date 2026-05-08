@@ -75,6 +75,62 @@ test('admin can update imap account', function () {
     ]);
 });
 
+test('admin can update imap account when stored password cannot be decrypted', function () {
+    $admin = User::factory()->admin()->create();
+    $account = ImapAccount::factory()->create(['name' => 'Pre Rotation']);
+
+    // Simulate APP_KEY rotation: stored ciphertext is no longer decryptable.
+    \Illuminate\Support\Facades\DB::table('imap_accounts')
+        ->where('id', $account->id)
+        ->update(['password' => 'eyJpdiI6ImludmFsaWQiLCJ2YWx1ZSI6ImludmFsaWQiLCJtYWMiOiJpbnZhbGlkIiwidGFnIjoiIn0=']);
+
+    $response = actingAs($admin)->put("/imap-accounts/{$account->id}", [
+        'name' => 'Post Rotation',
+        'host' => $account->host,
+        'port' => $account->port,
+        'encryption' => $account->encryption,
+        'validate_cert' => $account->validate_cert,
+        'username' => $account->username,
+        'password' => 'fresh-secret',
+        'folder' => $account->folder,
+        'is_active' => $account->is_active,
+        'sync_interval' => $account->sync_interval,
+        'delete_after_archive' => $account->delete_after_archive,
+    ]);
+
+    $response->assertRedirect('/imap-accounts');
+
+    $reloaded = ImapAccount::find($account->id);
+    expect($reloaded->name)->toBe('Post Rotation');
+    expect($reloaded->password)->toBe('fresh-secret');
+});
+
+test('admin can update imap account without changing password', function () {
+    $admin = User::factory()->admin()->create();
+    $account = ImapAccount::factory()->create();
+    $originalCiphertext = $account->getRawOriginal('password');
+
+    $response = actingAs($admin)->put("/imap-accounts/{$account->id}", [
+        'name' => 'Renamed',
+        'host' => $account->host,
+        'port' => $account->port,
+        'encryption' => $account->encryption,
+        'validate_cert' => $account->validate_cert,
+        'username' => $account->username,
+        'password' => '',
+        'folder' => $account->folder,
+        'is_active' => $account->is_active,
+        'sync_interval' => $account->sync_interval,
+        'delete_after_archive' => $account->delete_after_archive,
+    ]);
+
+    $response->assertRedirect('/imap-accounts');
+
+    $reloaded = ImapAccount::find($account->id);
+    expect($reloaded->name)->toBe('Renamed');
+    expect($reloaded->getRawOriginal('password'))->toBe($originalCiphertext);
+});
+
 test('admin can delete imap account', function () {
     $admin = User::factory()->admin()->create();
     $account = ImapAccount::factory()->create();

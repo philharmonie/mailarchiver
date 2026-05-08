@@ -6,6 +6,7 @@ use App\Models\ImapAccount;
 use App\Services\ImapService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -99,12 +100,18 @@ class ImapAccountController extends Controller
             'sync_interval' => 'nullable|in:every_15_minutes,hourly,every_6_hours,daily,weekly',
         ]);
 
-        // Only update password if provided
         if (empty($validated['password'])) {
             unset($validated['password']);
+        } else {
+            $validated['password'] = Crypt::encryptString($validated['password']);
         }
 
-        $imapAccount->update($validated);
+        // Use query builder to bypass Eloquent's dirty-check, which decrypts
+        // the existing password column to detect changes. After an APP_KEY
+        // rotation that decryption throws DecryptException, blocking edits.
+        ImapAccount::query()
+            ->whereKey($imapAccount->id)
+            ->update($validated + ['updated_at' => now()]);
 
         return redirect()->route('imap-accounts.index')
             ->with('success', 'IMAP account updated successfully.');

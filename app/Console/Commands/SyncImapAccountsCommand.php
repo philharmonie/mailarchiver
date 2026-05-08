@@ -71,7 +71,7 @@ class SyncImapAccountsCommand extends Command
             $failureCount
         ));
 
-        return self::SUCCESS;
+        return $failureCount > 0 ? self::FAILURE : self::SUCCESS;
     }
 
     protected function getAccountsToSync(?string $specificInterval): \Illuminate\Database\Eloquent\Collection

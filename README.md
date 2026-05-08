@@ -149,6 +149,26 @@ php artisan queue:work --daemon
 
 To properly classify internal emails, create a BCC map table in your database listing internal email addresses.
 
+### Monitoring (Optional)
+
+The scheduler exposes provider-agnostic hooks so you can be alerted when archiving stops. All settings are optional and configured via environment variables.
+
+| Variable | Purpose |
+|----------|---------|
+| `MONITORING_NOTIFY_EMAIL` | Email recipient for scheduler stdout/stderr on failure. Requires working `MAIL_*` config. |
+| `MONITORING_HEARTBEAT_URL` | URL pinged via GET after every successful `imap:sync` run. Acts as a dead-man's switch — if the endpoint stops receiving pings it alerts. |
+| `MONITORING_HEARTBEAT_URL_FAIL` | Optional separate URL pinged on failure (e.g. healthchecks.io `/fail`). |
+| `MONITORING_STALE_THRESHOLD_MINUTES` | Minutes after which an active IMAP account is rendered as **Stale** on the admin dashboard. Default: `60`. |
+
+The heartbeat URLs are simple HTTP GET requests, so any push-based health-check service works:
+
+- [Uptime Kuma](https://github.com/louislam/uptime-kuma) — Push monitor
+- [healthchecks.io](https://healthchecks.io)
+- [BetterUptime](https://betterstack.com/uptime) — Heartbeat
+- Custom webhook of your choice
+
+The admin dashboard shows the last sync time per account and flags accounts whose `last_sync_at` exceeds the configured threshold, so a quick visual check tells you whether archiving is healthy.
+
 ---
 
 ## Usage
@@ -237,7 +257,7 @@ Contributions are welcome! This project aims to build a robust, GoBD-compliant e
 - [ ] Horizontal scaling support
 - [ ] Read replicas for search
 - [ ] Background job optimization
-- [ ] Monitoring and alerting
+- [x] Monitoring and alerting (heartbeat URL + email on failure + stale dashboard indicator)
 - [ ] Backup/restore functionality
 
 ---
