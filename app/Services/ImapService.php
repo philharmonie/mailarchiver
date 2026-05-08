@@ -29,7 +29,18 @@ class ImapService
     {
         $this->currentAccount = $account;
 
-        $cm = new ClientManager;
+        // Override package-level options. webklex reads `options.rfc822` from
+        // the global config (not per-account), and the default uses
+        // \imap_rfc822_parse_headers, which emits a noisy E_WARNING
+        // ("Missing address after comma") on perfectly normal mail with
+        // trailing-comma address lists, surfacing as
+        // "PHP Request Shutdown: Missing address after comma".
+        $cm = new ClientManager([
+            'options' => [
+                'rfc822' => false,
+                'soft_fail' => true,
+            ],
+        ]);
 
         $config = [
             'host' => $account->host,
