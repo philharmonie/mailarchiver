@@ -9,8 +9,11 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Tick more often than the shortest per-account sync_interval so the
+// "due since last sync" check has fine-grained chances to fire. The
+// imap:sync command itself short-circuits when nothing is due.
 $sync = Schedule::command('imap:sync')
-    ->everyFifteenMinutes()
+    ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground()
     ->onOneServer();
