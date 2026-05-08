@@ -86,6 +86,8 @@ class ImapService
         $archived = [];
         $totalSize = 0;
         $current = 0;
+        $consecutiveChunkFailures = 0;
+        $maxConsecutiveChunkFailures = 3;
 
         // Process emails in chunks to avoid memory exhaustion
         $chunkSize = 25; // Process 25 emails at a time
@@ -99,18 +101,42 @@ class ImapService
             $remainingMessages = $totalMessages - $current;
             $currentChunkSize = min($chunkSize, $remainingMessages);
 
-            $chunkQuery->limit($currentChunkSize, $offset);
+            // webklex limit($count, $page) expects a 1-indexed page number,
+            // not a row offset. Convert our row offset accordingly.
+            $page = intdiv($offset, $chunkSize) + 1;
+            $chunkQuery->limit($currentChunkSize, $page);
 
             try {
                 $messages = $chunkQuery->get();
+                $consecutiveChunkFailures = 0;
             } catch (\Throwable $chunkError) {
+                $root = $chunkError;
+                while ($root->getPrevious() !== null) {
+                    $root = $root->getPrevious();
+                }
+
+                $consecutiveChunkFailures++;
+
                 Log::error('Chunk fetch failed, skipping range', [
                     'account' => $this->currentAccount->name,
                     'offset' => $offset,
+                    'page' => $page,
                     'chunk_size' => $currentChunkSize,
                     'error' => $chunkError->getMessage(),
                     'exception' => get_class($chunkError),
+                    'root_exception' => get_class($root),
+                    'root_message' => $root->getMessage(),
+                    'consecutive_failures' => $consecutiveChunkFailures,
                 ]);
+
+                if ($consecutiveChunkFailures >= $maxConsecutiveChunkFailures) {
+                    Log::warning('Stopping fetch after repeated chunk failures', [
+                        'account' => $this->currentAccount->name,
+                        'offset' => $offset,
+                        'consecutive_failures' => $consecutiveChunkFailures,
+                    ]);
+                    break;
+                }
 
                 $offset += $currentChunkSize;
                 $current += $currentChunkSize;
