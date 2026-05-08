@@ -101,7 +101,22 @@ class ImapService
 
             $chunkQuery->limit($currentChunkSize, $offset);
 
-            $messages = $chunkQuery->get();
+            try {
+                $messages = $chunkQuery->get();
+            } catch (\Throwable $chunkError) {
+                Log::error('Chunk fetch failed, skipping range', [
+                    'account' => $this->currentAccount->name,
+                    'offset' => $offset,
+                    'chunk_size' => $currentChunkSize,
+                    'error' => $chunkError->getMessage(),
+                    'exception' => get_class($chunkError),
+                ]);
+
+                $offset += $currentChunkSize;
+                $current += $currentChunkSize;
+
+                continue;
+            }
 
             if ($messages->isEmpty()) {
                 break;

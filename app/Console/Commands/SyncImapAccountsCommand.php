@@ -61,6 +61,9 @@ class SyncImapAccountsCommand extends Command
                     'account_id' => $account->id,
                     'account_name' => $account->name,
                     'error' => $e->getMessage(),
+                    'exception' => get_class($e),
+                    'file' => $e->getFile().':'.$e->getLine(),
+                    'trace' => collect($e->getTrace())->take(15)->map(fn ($f) => ($f['file'] ?? '?').':'.($f['line'] ?? '?').' '.($f['class'] ?? '').($f['type'] ?? '').($f['function'] ?? ''))->all(),
                 ]);
             }
         }
