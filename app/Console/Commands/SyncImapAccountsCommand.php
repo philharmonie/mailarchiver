@@ -39,7 +39,8 @@ class SyncImapAccountsCommand extends Command
 
         $this->info(sprintf('Found %d account(s) to sync', $accounts->count()));
 
-        $successCount = 0;
+        $archivedCount = 0;
+        $noNewCount = 0;
         $failureCount = 0;
 
         foreach ($accounts as $account) {
@@ -49,10 +50,10 @@ class SyncImapAccountsCommand extends Command
                 $result = $this->syncAccount($account);
 
                 if ($result) {
-                    $successCount++;
+                    $archivedCount++;
                     $this->info('  ✓ Synced successfully');
                 } else {
-                    $failureCount++;
+                    $noNewCount++;
                     $this->warn('  ⊝ No new emails');
                 }
 
@@ -74,11 +75,14 @@ class SyncImapAccountsCommand extends Command
         }
 
         $this->info(sprintf(
-            'Sync complete: %d successful, %d failed',
-            $successCount,
+            'Sync complete: %d archived, %d no-new, %d failed',
+            $archivedCount,
+            $noNewCount,
             $failureCount
         ));
 
+        // Only treat thrown exceptions as failures. "No new emails" is the
+        // healthy steady-state and must not trip Kuma down or alert mail.
         return $failureCount > 0 ? self::FAILURE : self::SUCCESS;
     }
 
