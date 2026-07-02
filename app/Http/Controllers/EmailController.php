@@ -81,29 +81,45 @@ class EmailController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->input('search');
+            $driver = config('scout.driver');
 
-            // Use Scout for full-text search if available
-            if (config('scout.driver') !== null) {
-                // Get all matching email IDs via Scout
-                $searchResults = Email::search($search)->take(1000)->get();
+            // Only use Scout for external engines (e.g. Meilisearch). The
+            // "collection" driver loads the entire table into memory to filter
+            // in PHP, which exhausts memory on large mailboxes, so fall back to
+            // a direct SQL search for it.
+            if ($driver !== null && $driver !== 'collection') {
+                // Hydrate only the columns needed for the ownership check to
+                // avoid pulling large body/raw_email columns into memory.
+                $searchResults = Email::search($search)
+                    ->take(1000)
+                    ->query(fn ($q) => $q->select([
+                        'id', 'from_address', 'to_addresses', 'cc_addresses',
+                        'bcc_addresses', 'bcc_map_type',
+                    ]))
+                    ->get();
 
-                // Filter by user ownership and bcc_map_type
-                $emailIds = $searchResults->filter(function ($email) use ($user) {
+                $emailIds = $searchResults->filter(function (Email $email) use ($user) {
                     return $this->isUserAuthorizedForEmail($email, $user->email);
-                })->pluck('id')->toArray();
+                })->pluck('id')->all();
 
-                if (! empty($emailIds)) {
-                    $query->whereIn('id', $emailIds);
-                } else {
-                    // No results, return empty query
+                if ($emailIds === []) {
                     $query->whereRaw('1 = 0');
+                } else {
+                    $query->whereIn('id', $emailIds);
                 }
             } else {
-                // Fallback to LIKE search
+                // Direct SQL search across the same fields Scout would index.
+                // The ownership filter above already restricts $query, so this
+                // only narrows the user's own emails further.
                 $query->where(function ($q) use ($search) {
-                    $q->where('subject', 'like', "%{$search}%")
-                        ->orWhere('from_address', 'like', "%{$search}%")
-                        ->orWhere('body_text', 'like', "%{$search}%");
+                    $like = "%{$search}%";
+                    $q->where('subject', 'like', $like)
+                        ->orWhere('from_address', 'like', $like)
+                        ->orWhere('from_name', 'like', $like)
+                        ->orWhere('message_id', 'like', $like)
+                        ->orWhere('to_addresses', 'like', $like)
+                        ->orWhere('cc_addresses', 'like', $like)
+                        ->orWhere('body_text', 'like', $like);
                 });
             }
         }
