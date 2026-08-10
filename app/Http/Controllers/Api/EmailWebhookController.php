@@ -46,13 +46,16 @@ class EmailWebhookController extends Controller
             ], 201);
         } catch (\Exception $e) {
             Log::error('Failed to archive email', [
-                'error' => $e->getMessage(),
+                'error' => EmailParserService::errorExcerpt($e),
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            // The reason stays in the log. A database error names the statement
+            // it failed on, and that statement is the mail that was posted here
+            // - not something to hand back over the wire.
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to archive email: '.$e->getMessage(),
+                'message' => 'Failed to archive email',
             ], 500);
         }
     }

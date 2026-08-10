@@ -58,7 +58,7 @@ class ImapService
             $this->client->connect();
         } catch (ConnectionFailedException $e) {
             Log::error('Failed to connect to IMAP server', [
-                'error' => $e->getMessage(),
+                'error' => EmailParserService::errorExcerpt($e),
                 'account' => $account->name,
                 'host' => $account->host,
             ]);
@@ -133,10 +133,10 @@ class ImapService
                     'offset' => $offset,
                     'page' => $page,
                     'chunk_size' => $currentChunkSize,
-                    'error' => $chunkError->getMessage(),
+                    'error' => EmailParserService::errorExcerpt($chunkError),
                     'exception' => get_class($chunkError),
                     'root_exception' => get_class($root),
-                    'root_message' => $root->getMessage(),
+                    'root_message' => EmailParserService::errorExcerpt($root),
                     'consecutive_failures' => $consecutiveChunkFailures,
                 ]);
 
@@ -192,7 +192,7 @@ class ImapService
                                 Log::error('Failed to delete duplicate email from server', [
                                     'account' => $this->currentAccount->name,
                                     'message_id' => $message->getMessageId(),
-                                    'error' => $deleteError->getMessage(),
+                                    'error' => EmailParserService::errorExcerpt($deleteError),
                                 ]);
                             }
                         }
@@ -234,7 +234,7 @@ class ImapService
                             Log::error('Failed to delete email from server after archival', [
                                 'account' => $this->currentAccount->name,
                                 'email_id' => $email->id,
-                                'error' => $deleteError->getMessage(),
+                                'error' => EmailParserService::errorExcerpt($deleteError),
                             ]);
                         }
                     }
@@ -252,7 +252,7 @@ class ImapService
                 } catch (\Exception $e) {
                     Log::error('Failed to archive email via IMAP', [
                         'account' => $this->currentAccount->name,
-                        'error' => $e->getMessage(),
+                        'error' => EmailParserService::errorExcerpt($e),
                         'message_id' => $message->getMessageId(),
                     ]);
 
@@ -338,7 +338,7 @@ class ImapService
             return $this->client->isConnected();
         } catch (\Exception $e) {
             Log::error('IMAP connection test failed', [
-                'error' => $e->getMessage(),
+                'error' => EmailParserService::errorExcerpt($e),
             ]);
 
             return false;

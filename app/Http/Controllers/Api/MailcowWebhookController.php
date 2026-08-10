@@ -62,7 +62,7 @@ class MailcowWebhookController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Mailcow webhook failed', [
-                'error' => $e->getMessage(),
+                'error' => EmailParserService::errorExcerpt($e),
                 'trace' => $e->getTraceAsString(),
             ]);
 

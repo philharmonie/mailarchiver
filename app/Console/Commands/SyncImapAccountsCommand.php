@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ImapAccount;
+use App\Services\EmailParserService;
 use App\Services\ImapService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -61,12 +62,19 @@ class SyncImapAccountsCommand extends Command
                 $account->update(['last_sync_at' => now()]);
             } catch (\Exception $e) {
                 $failureCount++;
-                $this->error("  ✗ Failed: {$e->getMessage()}");
+
+                // The scheduler's output is a log of its own - it goes to the
+                // journal and, with MONITORING_NOTIFY_EMAIL set, into a mail.
+                // A database error carries the statement that failed, and here
+                // that statement is somebody's mail.
+                $excerpt = EmailParserService::errorExcerpt($e);
+
+                $this->error("  ✗ Failed: {$excerpt}");
 
                 Log::error('Auto-sync failed for account', [
                     'account_id' => $account->id,
                     'account_name' => $account->name,
-                    'error' => $e->getMessage(),
+                    'error' => $excerpt,
                     'exception' => get_class($e),
                     'file' => $e->getFile().':'.$e->getLine(),
                     'trace' => collect($e->getTrace())->take(15)->map(fn ($f) => ($f['file'] ?? '?').':'.($f['line'] ?? '?').' '.($f['class'] ?? '').($f['type'] ?? '').($f['function'] ?? ''))->all(),

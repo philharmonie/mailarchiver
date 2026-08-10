@@ -4,16 +4,41 @@ namespace App\Services;
 
 use App\Models\Attachment;
 use App\Models\Email;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Webklex\PHPIMAP\Message;
 
 class EmailParserService
 {
+    /**
+     * How much of an exception message may reach a log.
+     */
+    public const ERROR_EXCERPT = 300;
+
     public function __construct(
         protected CompressionService $compression,
         protected TextExtractorService $textExtractor
     ) {}
+
+    /**
+     * What may be written down when handling a mail fails.
+     *
+     * Everything that goes wrong in here goes wrong about a mail, and the
+     * exception tends to carry it: a QueryException prints the statement it
+     * failed on, and that statement is the mail - subject, addresses, body -
+     * in clear text, in a file that is not the archive, once per attempt. The
+     * driver says what went wrong; the statement only says what it went wrong
+     * on, and the log line next to it already says that.
+     */
+    public static function errorExcerpt(\Throwable $e): string
+    {
+        $message = $e instanceof QueryException
+            ? ($e->getPrevious()?->getMessage() ?? Str::before($e->getMessage(), ' (Connection: '))
+            : $e->getMessage();
+
+        return Str::limit($message, self::ERROR_EXCERPT);
+    }
 
     public function parseAndStore(string $rawEmail): Email
     {
