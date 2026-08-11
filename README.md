@@ -156,9 +156,15 @@ The scheduler exposes provider-agnostic hooks so you can be alerted when archivi
 | Variable | Purpose |
 |----------|---------|
 | `MONITORING_NOTIFY_EMAIL` | Email recipient for scheduler stdout/stderr on failure. Requires working `MAIL_*` config. |
-| `MONITORING_HEARTBEAT_URL` | URL pinged via GET after every successful `imap:sync` run. Acts as a dead-man's switch — if the endpoint stops receiving pings it alerts. |
-| `MONITORING_HEARTBEAT_URL_FAIL` | Optional separate URL pinged on failure (e.g. healthchecks.io `/fail`). |
-| `MONITORING_STALE_THRESHOLD_MINUTES` | Minutes after which an active IMAP account is rendered as **Stale** on the admin dashboard. Default: `60`. |
+| `MONITORING_HEARTBEAT_URL` | URL pinged via GET by the scheduled `monitoring:heartbeat` command, while every active account was synced within the stale threshold. Acts as a dead-man's switch — if the endpoint stops receiving pings it alerts. |
+| `MONITORING_HEARTBEAT_URL_FAIL` | Optional separate URL pinged once an account falls behind, so the monitor goes red at that moment (e.g. healthchecks.io `/fail`, or the same Uptime Kuma token with `?status=down&msg=stale`). |
+| `MONITORING_STALE_THRESHOLD_MINUTES` | Minutes after which an active IMAP account counts as stale: rendered as **Stale** on the admin dashboard, and withheld from the heartbeat. Default: `60`. |
+
+The heartbeat deliberately does not hang off the exit code of `imap:sync`. A run
+where no account was due archives nothing and still succeeds, so an exit-code
+ping keeps reporting "OK" through an archive that has stopped moving.
+`monitoring:heartbeat` reads `last_sync_at` instead, which is the thing the
+monitor is meant to answer for.
 
 The heartbeat URLs are simple HTTP GET requests, so any push-based health-check service works:
 
