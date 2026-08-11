@@ -60,3 +60,94 @@ test('heartbeat url is pinged via http when configured', function () {
 
     Http::assertSent(fn ($request) => $request->url() === $url);
 });
+
+test('heartbeat pings while every active account is inside the threshold', function () {
+    Http::fake();
+    config()->set('monitoring.heartbeat_url', 'https://example.test/up');
+    config()->set('monitoring.heartbeat_url_fail', 'https://example.test/down');
+    config()->set('monitoring.stale_threshold_minutes', 60);
+
+    ImapAccount::factory()->create([
+        'is_active' => true,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => now()->subMinutes(10),
+    ]);
+
+    $this->artisan('monitoring:heartbeat')->assertSuccessful();
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.test/up');
+    Http::assertNotSent(fn ($request) => $request->url() === 'https://example.test/down');
+});
+
+test('heartbeat is withheld once an account falls behind', function () {
+    Http::fake();
+    config()->set('monitoring.heartbeat_url', 'https://example.test/up');
+    config()->set('monitoring.heartbeat_url_fail', 'https://example.test/down');
+    config()->set('monitoring.stale_threshold_minutes', 60);
+
+    ImapAccount::factory()->create([
+        'name' => 'Fresh Box',
+        'is_active' => true,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => now()->subMinutes(10),
+    ]);
+    ImapAccount::factory()->create([
+        'name' => 'Stuck Box',
+        'is_active' => true,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => now()->subHours(4),
+    ]);
+
+    $this->artisan('monitoring:heartbeat')
+        ->expectsOutputToContain('Stuck Box')
+        ->assertFailed();
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.test/down');
+    Http::assertNotSent(fn ($request) => $request->url() === 'https://example.test/up');
+});
+
+test('an account that never synced is stale', function () {
+    Http::fake();
+    config()->set('monitoring.heartbeat_url', 'https://example.test/up');
+
+    ImapAccount::factory()->create([
+        'is_active' => true,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => null,
+    ]);
+
+    $this->artisan('monitoring:heartbeat')->assertFailed();
+
+    Http::assertNothingSent();
+});
+
+test('inactive accounts are not watched, but none left at all is a failure', function () {
+    Http::fake();
+    config()->set('monitoring.heartbeat_url', 'https://example.test/up');
+
+    ImapAccount::factory()->create([
+        'is_active' => false,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => now()->subYear(),
+    ]);
+
+    $this->artisan('monitoring:heartbeat')->assertFailed();
+
+    Http::assertNothingSent();
+});
+
+test('heartbeat stays quiet when no url is configured', function () {
+    Http::fake();
+    config()->set('monitoring.heartbeat_url', null);
+    config()->set('monitoring.heartbeat_url_fail', null);
+
+    ImapAccount::factory()->create([
+        'is_active' => true,
+        'sync_interval' => 'every_15_minutes',
+        'last_sync_at' => now()->subMinutes(5),
+    ]);
+
+    $this->artisan('monitoring:heartbeat')->assertSuccessful();
+
+    Http::assertNothingSent();
+});

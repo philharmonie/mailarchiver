@@ -2,7 +2,6 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -32,14 +31,12 @@ if ($notifyEmail = config('monitoring.notify_email')) {
     $sync->emailOutputOnFailure($notifyEmail);
 }
 
-if ($heartbeatUrl = config('monitoring.heartbeat_url')) {
-    $sync->onSuccess(function () use ($heartbeatUrl) {
-        Http::timeout(5)->get($heartbeatUrl);
-    });
-}
-
-if ($heartbeatFailUrl = config('monitoring.heartbeat_url_fail')) {
-    $sync->onFailure(function () use ($heartbeatFailUrl) {
-        Http::timeout(5)->get($heartbeatFailUrl);
-    });
-}
+// The heartbeat hung off this command's exit code and said nothing about the
+// archive: a run where nothing was due succeeds, so the ping stayed green
+// through hours of standstill. monitoring:heartbeat reads last_sync_at
+// instead and is the only voice towards the check - two writers would flap,
+// one pushing "down" for a failed run while the other still finds the
+// accounts fresh.
+Schedule::command('monitoring:heartbeat')
+    ->everyFiveMinutes()
+    ->onOneServer();

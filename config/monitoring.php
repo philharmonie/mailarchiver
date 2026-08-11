@@ -20,12 +20,16 @@ return [
     | Heartbeat URLs
     |--------------------------------------------------------------------------
     |
-    | Optional push-based health-check endpoints. The success URL is hit
-    | after every successful scheduler run (dead-man's switch — if the
-    | check stops receiving pings it alerts). The failure URL is hit when
-    | the scheduler reports a failure. Compatible with any provider that
-    | exposes a simple GET endpoint (Uptime Kuma push monitor,
-    | healthchecks.io, BetterUptime heartbeat, custom webhooks, etc.).
+    | Optional push-based health-check endpoints, pinged by the scheduled
+    | `monitoring:heartbeat` command. The success URL is hit while every
+    | active account is synced within the stale threshold below (dead-man's
+    | switch — if the check stops receiving pings it alerts); the failure URL
+    | is hit as soon as one of them falls behind, so the monitor goes red at
+    | that moment instead of waiting out its own interval. Compatible with any
+    | provider that exposes a simple GET endpoint (Uptime Kuma push monitor,
+    | healthchecks.io, BetterUptime heartbeat, custom webhooks, etc.) — for
+    | Uptime Kuma, point the failure URL at the same token with
+    | ?status=down&msg=stale.
     |
     */
 
