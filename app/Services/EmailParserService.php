@@ -40,6 +40,48 @@ class EmailParserService
         return Str::limit($message, self::ERROR_EXCERPT);
     }
 
+    /**
+     * Mail as the database can hold it.
+     *
+     * A mail is bytes, not text: a sender may label a body utf-8 and send
+     * latin-1 anyway, and a client may encode an emoji as a surrogate pair
+     * that utf-8 has no room for. MySQL refuses both, and the whole insert
+     * fails - so the mail is not archived at all, and the next sync tries it
+     * again, forever. Replace what cannot be stored and keep the mail.
+     *
+     * Only the parsed columns pass through here. `raw_email` keeps the bytes
+     * as they arrived, which is the copy that has to stay faithful.
+     */
+    public static function toUtf8(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map([self::class, 'toUtf8'], $value);
+        }
+
+        if (! is_string($value) || mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+    }
+
+    /**
+     * The same for a row about to be written, minus the columns that hold
+     * bytes rather than text.
+     */
+    protected static function toUtf8Row(array $row): array
+    {
+        foreach ($row as $column => $value) {
+            if ($column === 'raw_email') {
+                continue;
+            }
+
+            $row[$column] = self::toUtf8($value);
+        }
+
+        return $row;
+    }
+
     public function parseAndStore(string $rawEmail): Email
     {
         $parsed = $this->parseRawEmail($rawEmail);
@@ -49,7 +91,7 @@ class EmailParserService
             ? $this->compression->compress($rawEmail)
             : $rawEmail;
 
-        $email = Email::create([
+        $email = Email::create(self::toUtf8Row([
             'message_id' => $parsed['message_id'],
             'in_reply_to' => $parsed['in_reply_to'],
             'references' => $parsed['references'],
@@ -70,7 +112,7 @@ class EmailParserService
             'is_compressed' => $shouldCompress,
             'raw_email' => $rawEmailToStore,
             'has_attachments' => ! empty($parsed['attachments']),
-        ]);
+        ]));
 
         foreach ($parsed['attachments'] ?? [] as $attachmentData) {
             $this->storeAttachment($email, $attachmentData);
@@ -144,7 +186,7 @@ class EmailParserService
         $bccMapType = $this->detectBccMapType($fromAddress, $toAddresses);
 
         // Prepare email data array (reusable for internal emails)
-        $emailData = [
+        $emailData = self::toUtf8Row([
             'message_id' => $messageId,
             'in_reply_to' => $message->getInReplyTo(),
             'references' => $message->getReferences() ? explode(' ', $message->getReferences()) : null,
@@ -165,7 +207,7 @@ class EmailParserService
             'is_compressed' => $shouldCompress,
             'raw_email' => $rawEmailToStore,
             'has_attachments' => $message->hasAttachments(),
-        ];
+        ]);
 
         // Attachment data (will be attached to both emails if internal)
         $attachmentData = [];
@@ -336,7 +378,9 @@ class EmailParserService
     protected function storeAttachment(Email $email, array $attachmentData): Attachment
     {
         $contents = $attachmentData['contents'];
-        $filename = $attachmentData['filename'];
+        // Also what the storage path is built from, so a mail cannot name a
+        // file in bytes the file system has to carry afterwards.
+        $filename = self::toUtf8($attachmentData['filename']);
         $mimeType = $attachmentData['mime_type'] ?? 'application/octet-stream';
         $size = strlen($contents);
 
@@ -383,7 +427,7 @@ class EmailParserService
         $extractedText = null;
         if ($this->textExtractor->canExtract($mimeType)) {
             $fullPath = Storage::disk('local')->path($storagePath);
-            $extractedText = $this->textExtractor->extractText($fullPath, $mimeType);
+            $extractedText = self::toUtf8($this->textExtractor->extractText($fullPath, $mimeType));
         }
 
         return Attachment::create([
@@ -470,7 +514,7 @@ class EmailParserService
         $extractedText = null;
         if ($this->textExtractor->canExtract($mimeType)) {
             $fullPath = Storage::disk('local')->path($storagePath);
-            $extractedText = $this->textExtractor->extractText($fullPath, $mimeType);
+            $extractedText = self::toUtf8($this->textExtractor->extractText($fullPath, $mimeType));
         }
 
         \Illuminate\Support\Facades\Log::info('Large attachment stored successfully', [
