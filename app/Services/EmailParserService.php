@@ -16,6 +16,33 @@ class EmailParserService
      */
     public const ERROR_EXCERPT = 300;
 
+    /**
+     * How much of a header each column can hold.
+     *
+     * A mail is under no obligation to be brief, and MySQL in strict mode
+     * answers one character too many with error 1406 and drops the whole
+     * insert - so the mail is not archived at all, and the next sync tries it
+     * again, forever. The same shape of failure as unstorable bytes below;
+     * "HM Priv" lost 45 mails per run to a subject longer than 255.
+     *
+     * The subject is the one worth room, because the archive is searched and
+     * sorted by it: 512 characters, which is also as wide as its index may
+     * get (utf8mb4 at four bytes a character, against InnoDB's 3072-byte key
+     * limit). The rest keep their column width - an address or a message id
+     * that long is malformed rather than long.
+     *
+     * Cutting here costs the archive nothing it has to keep: raw_email holds
+     * the mail as it arrived, headers included, and that is the copy GoBD
+     * asks to stay faithful.
+     */
+    public const COLUMN_LIMITS = [
+        'message_id' => 255,
+        'in_reply_to' => 255,
+        'from_address' => 255,
+        'from_name' => 255,
+        'subject' => 512,
+    ];
+
     public function __construct(
         protected CompressionService $compression,
         protected TextExtractorService $textExtractor
@@ -67,16 +94,27 @@ class EmailParserService
 
     /**
      * The same for a row about to be written, minus the columns that hold
-     * bytes rather than text.
+     * bytes rather than text: what is not valid utf-8 is replaced, and what
+     * is longer than its column can hold is cut.
      */
-    protected static function toUtf8Row(array $row): array
+    protected static function toStorableRow(array $row): array
     {
         foreach ($row as $column => $value) {
             if ($column === 'raw_email') {
                 continue;
             }
 
-            $row[$column] = self::toUtf8($value);
+            $value = self::toUtf8($value);
+
+            $limit = self::COLUMN_LIMITS[$column] ?? null;
+
+            // Characters, not bytes: that is what a utf8mb4 varchar counts,
+            // and cutting bytes would end a mail in half a character.
+            if ($limit !== null && is_string($value) && mb_strlen($value) > $limit) {
+                $value = mb_substr($value, 0, $limit);
+            }
+
+            $row[$column] = $value;
         }
 
         return $row;
@@ -91,7 +129,7 @@ class EmailParserService
             ? $this->compression->compress($rawEmail)
             : $rawEmail;
 
-        $email = Email::create(self::toUtf8Row([
+        $email = Email::create(self::toStorableRow([
             'message_id' => $parsed['message_id'],
             'in_reply_to' => $parsed['in_reply_to'],
             'references' => $parsed['references'],
@@ -186,7 +224,7 @@ class EmailParserService
         $bccMapType = $this->detectBccMapType($fromAddress, $toAddresses);
 
         // Prepare email data array (reusable for internal emails)
-        $emailData = self::toUtf8Row([
+        $emailData = self::toStorableRow([
             'message_id' => $messageId,
             'in_reply_to' => $message->getInReplyTo(),
             'references' => $message->getReferences() ? explode(' ', $message->getReferences()) : null,
