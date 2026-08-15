@@ -104,17 +104,34 @@ class ImapService
         $chunkSize = 25; // Process 25 emails at a time
         $offset = 0;
 
+        // With delete_after_archive the folder shrinks under the cursor: every
+        // archived message is expunged, so what was page 2 becomes page 1.
+        // Paging forward then steps over whole ranges, and the mail in them
+        // stays behind for some later run to stumble over - which is also what
+        // asks the server for pages past the end and produces "Chunk fetch
+        // failed". Read the first page again instead, and remember the uids
+        // already tried: a message that cannot be archived stays in the folder
+        // and would otherwise hand us the same page forever.
+        $shrinkingFolder = (bool) $this->currentAccount->delete_after_archive;
+        $attemptedUids = [];
+        $stuckOffset = 0;
+
         while ($current < $totalMessages) {
             // Fetch next chunk of messages
             $chunkQuery = $folder->query()->whereAll();
 
-            // Apply limit to chunk
+            // Apply limit to chunk. Mail that refused to be deleted stays at
+            // the head of a shrinking folder, so ask for it *and* a full chunk
+            // of fresh messages behind it - otherwise the same few would fill
+            // every window from here on.
             $remainingMessages = $totalMessages - $current;
-            $currentChunkSize = min($chunkSize, $remainingMessages);
+            $currentChunkSize = min($chunkSize, $remainingMessages) + $stuckOffset;
 
             // webklex limit($count, $page) expects a 1-indexed page number,
-            // not a row offset. Convert our row offset accordingly.
-            $page = intdiv($offset, $chunkSize) + 1;
+            // not a row offset. Convert our row offset accordingly - unless the
+            // folder is shrinking, where the next unread message is always back
+            // on page one.
+            $page = $shrinkingFolder ? 1 : intdiv($offset, $chunkSize) + 1;
             $chunkQuery->limit($currentChunkSize, $page);
 
             try {
@@ -159,6 +176,30 @@ class ImapService
                 break;
             }
 
+            if ($shrinkingFolder) {
+                $fresh = $messages->filter(
+                    fn (Message $message) => ! isset($attemptedUids[$message->getUid()])
+                );
+
+                // What is left of this window is what could not be deleted, and
+                // the next window has to reach past it.
+                $stuckOffset = $messages->count() - $fresh->count();
+
+                if ($fresh->isEmpty()) {
+                    // The window covers the stuck mail plus a full chunk behind
+                    // it, so nothing fresh here means nothing fresh left.
+                    Log::warning('Stopping fetch, only undeletable mail left in folder', [
+                        'account' => $this->currentAccount->name,
+                        'stuck_messages' => $stuckOffset,
+                        'processed' => $current,
+                    ]);
+
+                    break;
+                }
+
+                $messages = $fresh;
+            }
+
             Log::debug('Processing email chunk', [
                 'account' => $this->currentAccount->name,
                 'chunk_size' => $messages->count(),
@@ -169,6 +210,7 @@ class ImapService
 
             foreach ($messages as $message) {
                 $current++;
+                $attemptedUids[$message->getUid()] = true;
 
                 try {
                     $email = $this->archiveMessage($message);
