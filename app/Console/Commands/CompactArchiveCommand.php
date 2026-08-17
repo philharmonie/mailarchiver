@@ -38,6 +38,12 @@ class CompactArchiveCommand extends Command
 
     public function handle(): int
     {
+        // Every mail is held whole for as long as it takes to take it apart,
+        // and an archived mail with attachments runs to megabytes. The default
+        // 128M ceiling is gone after a handful of them - same reason the sync
+        // raises it, so it reads the same setting.
+        ini_set('memory_limit', (string) config('monitoring.sync_memory_limit'));
+
         $dryRun = (bool) $this->option('dry-run');
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
 
@@ -58,7 +64,9 @@ class CompactArchiveCommand extends Command
         $skipped = 0;
         $freed = 0;
 
-        $query->chunkById(100, function ($emails) use (&$done, &$split, &$skipped, &$freed, $bar, $dryRun, $limit) {
+        // Small chunks, and every mail let go of before the next: what is held
+        // here is whole mail bodies, not rows.
+        $query->chunkById(25, function ($emails) use (&$done, &$split, &$skipped, &$freed, $bar, $dryRun, $limit) {
             foreach ($emails as $email) {
                 if ($limit !== null && $done >= $limit) {
                     return false;
@@ -80,7 +88,11 @@ class CompactArchiveCommand extends Command
 
                 $done++;
                 $bar->advance();
+
+                unset($email);
             }
+
+            gc_collect_cycles();
 
             return true;
         });
