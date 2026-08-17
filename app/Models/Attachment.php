@@ -24,6 +24,8 @@ class Attachment extends Model
         'reference_count',
         'storage_path',
         'storage_disk',
+        'raw_part_hash',
+        'raw_part_encoding',
         'content_id',
         'is_inline',
         'extracted_text',
@@ -47,8 +49,25 @@ class Attachment extends Model
         return $this->morphMany(AuditLog::class, 'auditable');
     }
 
+    /**
+     * The attachment's bytes.
+     *
+     * An attachment archived since the raw parts landed has no file of its
+     * own: the very same bytes already sit inside the mail, base64-encoded,
+     * and that is where they are read from. Older ones still have their file.
+     */
     public function getContents(): string
     {
+        if ($this->raw_part_hash !== null) {
+            $part = RawPart::where('hash', $this->raw_part_hash)->first();
+
+            if (! $part) {
+                throw new \RuntimeException("Attachment {$this->id} points at a raw part that is gone");
+            }
+
+            return $this->raw_part_encoding === 'base64' ? $part->decoded() : $part->contents();
+        }
+
         $contents = Storage::disk($this->storage_disk)->get($this->storage_path);
 
         if ($this->is_compressed) {
@@ -89,6 +108,12 @@ class Attachment extends Model
 
     public function deleteFile(): void
     {
+        // Nothing of its own to delete: the bytes belong to the mail's raw
+        // part, which the mail itself accounts for.
+        if ($this->raw_part_hash !== null || $this->storage_path === null) {
+            return;
+        }
+
         if (Storage::disk($this->storage_disk)->exists($this->storage_path)) {
             Storage::disk($this->storage_disk)->delete($this->storage_path);
         }

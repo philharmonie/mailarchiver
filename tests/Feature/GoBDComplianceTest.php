@@ -5,8 +5,6 @@ use App\Models\AuditLog;
 use App\Models\Email;
 use App\Services\CompressionService;
 
-use function Pest\Laravel\actingAs;
-
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 test('compression service compresses and decompresses data', function () {

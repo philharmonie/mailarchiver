@@ -19,7 +19,6 @@ class EmailFactory extends Factory
         $fromEmail = fake()->safeEmail();
         $subject = fake()->sentence();
         $bodyText = fake()->paragraphs(3, true);
-        $bodyHtml = '<p>'.implode('</p><p>', fake()->paragraphs(3)).'</p>';
 
         $rawEmail = "From: {$fromEmail}\nSubject: {$subject}\n\n{$bodyText}";
 
@@ -34,7 +33,6 @@ class EmailFactory extends Factory
             'bcc_addresses' => null,
             'subject' => $subject,
             'body_text' => $bodyText,
-            'body_html' => $bodyHtml,
             'headers' => [
                 'Return-Path' => $fromEmail,
                 'Content-Type' => 'text/html; charset=UTF-8',

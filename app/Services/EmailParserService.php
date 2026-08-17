@@ -45,8 +45,36 @@ class EmailParserService
 
     public function __construct(
         protected CompressionService $compression,
-        protected TextExtractorService $textExtractor
+        protected TextExtractorService $textExtractor,
+        protected RawEmailStore $rawParts
     ) {}
+
+    /**
+     * How a mail is written down: the attachments are lifted out into raw
+     * parts so their bytes are stored once, and what stays is compressed.
+     *
+     * The hash is taken over the mail as it arrived, before any of this - it
+     * has to answer for the original, and RawEmailStore hands the original
+     * back byte for byte.
+     *
+     * @return array{split: array, columns: array{raw_email: string, raw_parts: array, is_compressed: bool}}
+     */
+    protected function storableRaw(string $rawEmail): array
+    {
+        $split = $this->rawParts->split($rawEmail);
+        $skeleton = $split['skeleton'];
+
+        $compress = $this->compression->shouldCompress(strlen($skeleton));
+
+        return [
+            'split' => $split,
+            'columns' => [
+                'raw_email' => $compress ? $this->compression->compress($skeleton) : $skeleton,
+                'raw_parts' => $split['hashes'],
+                'is_compressed' => $compress,
+            ],
+        ];
+    }
 
     /**
      * What may be written down when handling a mail fails.
@@ -124,10 +152,8 @@ class EmailParserService
     {
         $parsed = $this->parseRawEmail($rawEmail);
 
-        $shouldCompress = $this->compression->shouldCompress(strlen($rawEmail));
-        $rawEmailToStore = $shouldCompress
-            ? $this->compression->compress($rawEmail)
-            : $rawEmail;
+        $stored = $this->storableRaw($rawEmail);
+        $this->rawParts->persist($stored['split']);
 
         $email = Email::create(self::toStorableRow([
             'message_id' => $parsed['message_id'],
@@ -140,20 +166,18 @@ class EmailParserService
             'bcc_addresses' => $parsed['bcc_addresses'],
             'subject' => $parsed['subject'],
             'body_text' => $parsed['body_text'],
-            'body_html' => $parsed['body_html'],
             'headers' => $parsed['headers'],
             'received_at' => $parsed['received_at'],
             'archived_at' => now(),
             'size_bytes' => strlen($rawEmail),
             'hash' => Email::generateHash($rawEmail),
             'is_verified' => true,
-            'is_compressed' => $shouldCompress,
-            'raw_email' => $rawEmailToStore,
             'has_attachments' => ! empty($parsed['attachments']),
+            ...$stored['columns'],
         ]));
 
         foreach ($parsed['attachments'] ?? [] as $attachmentData) {
-            $this->storeAttachment($email, $attachmentData);
+            $this->storeAttachment($email, $attachmentData, $stored['split']['decoded_hashes']);
         }
 
         return $email->fresh('attachments');
@@ -215,10 +239,8 @@ class EmailParserService
             }
         }
 
-        $shouldCompress = $this->compression->shouldCompress(strlen($rawEmail));
-        $rawEmailToStore = $shouldCompress
-            ? $this->compression->compress($rawEmail)
-            : $rawEmail;
+        $stored = $this->storableRaw($rawEmail);
+        $this->rawParts->persist($stored['split']);
 
         // Detect BCC map type based on from/to addresses
         $bccMapType = $this->detectBccMapType($fromAddress, $toAddresses);
@@ -235,16 +257,14 @@ class EmailParserService
             'bcc_addresses' => null, // BCC is typically not in headers
             'subject' => $message->getSubject() ?: '(No Subject)',
             'body_text' => $message->getTextBody(),
-            'body_html' => $message->getHTMLBody(),
             'headers' => $message->getHeaders()->toArray(),
             'received_at' => $receivedAt,
             'archived_at' => now(),
             'size_bytes' => strlen($rawEmail),
             'hash' => Email::generateHash($rawEmail),
             'is_verified' => true,
-            'is_compressed' => $shouldCompress,
-            'raw_email' => $rawEmailToStore,
             'has_attachments' => $message->hasAttachments(),
+            ...$stored['columns'],
         ]);
 
         // Attachment data (will be attached to both emails if internal)
@@ -272,7 +292,7 @@ class EmailParserService
 
             // Store attachments for sender email
             foreach ($attachmentData as $attachment) {
-                $this->storeAttachment($senderEmail, $attachment);
+                $this->storeAttachment($senderEmail, $attachment, $stored['split']['decoded_hashes']);
             }
 
             // Create second email as 'recipient' (incoming)
@@ -284,7 +304,7 @@ class EmailParserService
 
             // Store attachments for recipient email
             foreach ($attachmentData as $attachment) {
-                $this->storeAttachment($recipientEmail, $attachment);
+                $this->storeAttachment($recipientEmail, $attachment, $stored['split']['decoded_hashes']);
             }
 
             // Return the sender email (primary record)
@@ -298,7 +318,7 @@ class EmailParserService
 
         // Store attachments
         foreach ($attachmentData as $attachment) {
-            $this->storeAttachment($email, $attachment);
+            $this->storeAttachment($email, $attachment, $stored['split']['decoded_hashes']);
         }
 
         return $email->fresh('attachments');
@@ -340,7 +360,6 @@ class EmailParserService
             'bcc_addresses' => $this->parseEmailList($this->extractHeader($headers, 'Bcc')),
             'subject' => $this->extractHeader($headers, 'Subject', '(No Subject)'),
             'body_text' => trim($body),
-            'body_html' => null,
             'headers' => $headers,
             'received_at' => $this->parseDate($this->extractHeader($headers, 'Date')) ?? now(),
             'attachments' => [],
@@ -413,7 +432,10 @@ class EmailParserService
         }
     }
 
-    protected function storeAttachment(Email $email, array $attachmentData): Attachment
+    /**
+     * @param  array<string, string>  $partHashes  raw part hash => sha256 of what it decodes to
+     */
+    protected function storeAttachment(Email $email, array $attachmentData, array $partHashes = []): Attachment
     {
         $contents = $attachmentData['contents'];
         // Also what the storage path is built from, so a mail cannot name a
@@ -421,6 +443,32 @@ class EmailParserService
         $filename = self::toUtf8($attachmentData['filename']);
         $mimeType = $attachmentData['mime_type'] ?? 'application/octet-stream';
         $size = strlen($contents);
+
+        $hash = Attachment::generateHash($contents);
+
+        // These bytes are already stored: they are the base64 run that was
+        // lifted out of this very mail. Point at it rather than writing a
+        // second copy - that copy was half of what the archive cost.
+        $partHash = array_search($hash, $partHashes, strict: true);
+
+        if ($partHash !== false) {
+            return Attachment::create([
+                'email_id' => $email->id,
+                'filename' => $filename,
+                'mime_type' => $mimeType,
+                'size_bytes' => $size,
+                'hash' => $hash,
+                'is_compressed' => false,
+                'reference_count' => 1,
+                'storage_path' => null,
+                'storage_disk' => 'local',
+                'raw_part_hash' => $partHash,
+                'raw_part_encoding' => 'base64',
+                'content_id' => $attachmentData['content_id'] ?? null,
+                'is_inline' => $attachmentData['is_inline'] ?? false,
+                'extracted_text' => $this->extractTextFrom($contents, $mimeType),
+            ]);
+        }
 
         // For large attachments (>5MB), use memory-efficient processing
         $largeAttachmentThreshold = 5 * 1024 * 1024; // 5MB
@@ -430,8 +478,6 @@ class EmailParserService
         }
 
         // Regular processing for smaller attachments
-        $hash = Attachment::generateHash($contents);
-
         $existingAttachment = Attachment::findByHash($hash);
 
         if ($existingAttachment) {
@@ -482,6 +528,32 @@ class EmailParserService
             'is_inline' => $attachmentData['is_inline'] ?? false,
             'extracted_text' => $extractedText,
         ]);
+    }
+
+    /**
+     * Text an attachment can be searched by, pulled out of bytes that have no
+     * file of their own yet. The extractors read paths, so it gets one for as
+     * long as it takes.
+     */
+    protected function extractTextFrom(string $contents, string $mimeType): ?string
+    {
+        if (! $this->textExtractor->canExtract($mimeType)) {
+            return null;
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'mailarchive-');
+
+        if ($path === false) {
+            return null;
+        }
+
+        try {
+            file_put_contents($path, $contents);
+
+            return self::toUtf8($this->textExtractor->extractText($path, $mimeType));
+        } finally {
+            @unlink($path);
+        }
     }
 
     /**

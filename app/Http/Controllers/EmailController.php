@@ -159,7 +159,12 @@ class EmailController extends Controller
         }
 
         $email->load('attachments', 'auditLogs.user');
-        $email->makeVisible(['body_html', 'body_text', 'headers']);
+        $email->makeVisible(['body_text', 'headers']);
+
+        // Read out of raw_email rather than off a column of its own - see
+        // Email::deriveBodyHtml(). The view reads it under the name it always
+        // had.
+        $email->setAttribute('body_html', $email->deriveBodyHtml());
 
         AuditLog::log($email, 'viewed', 'Email viewed by user');
 
