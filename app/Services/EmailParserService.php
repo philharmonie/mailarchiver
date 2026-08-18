@@ -113,6 +113,16 @@ class EmailParserService
             return array_map([self::class, 'toUtf8'], $value);
         }
 
+        // webklex hands most header values over as Attribute objects, not
+        // strings. They stringify on their way into the database, which is too
+        // late for anything here to have looked at them - a subject that
+        // arrives as an object walks straight past the length limit below and
+        // the insert fails with 1406, once per sync, forever. Dates are left
+        // alone; they have a column type of their own.
+        if (is_object($value) && ! $value instanceof \DateTimeInterface && method_exists($value, '__toString')) {
+            $value = (string) $value;
+        }
+
         if (! is_string($value) || mb_check_encoding($value, 'UTF-8')) {
             return $value;
         }
